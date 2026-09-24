@@ -25,7 +25,7 @@ function initials(name = "") {
     .join("");
 }
 
-export default function Header() {
+export default function Header({ sidebarOpen, onToggleSidebar }) {
   const { user, logout, isManager, isCashier } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -42,12 +42,25 @@ export default function Header() {
   }
 
   return (
-    <header className="fixed top-1.5 left-[18rem] right-0 h-[4.5rem] bg-white/90 backdrop-blur-xl border-b border-border-subtle z-40 px-6 flex items-center justify-between">
-      {/* Kolom pencarian global dihapus (belum pernah berfungsi & tidak
-          dipakai). Ruang kirinya diisi konteks wilayah/gerai yang sedang
-          dilihat: manager melihat kabupatennya, supervisor & kasir melihat
-          gerai tempat mereka bertugas. */}
-      
+    <header
+      className={`fixed top-1.5 right-0 h-[4.5rem] bg-white/90 backdrop-blur-xl border-b border-border-subtle z-40 px-6 flex items-center justify-between transition-[left] duration-300 ease-in-out ${
+        sidebarOpen ? "left-[18rem]" : "left-0"
+      }`}
+    >
+      {/* Tombol buka/tutup sidebar. Kolom pencarian global dihapus (belum
+          pernah berfungsi & tidak dipakai), jadi slot kiri header ini
+          sekarang dipakai buat toggle sidebar. */}
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        title={sidebarOpen ? "Sembunyikan menu" : "Tampilkan menu"}
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-text-muted hover:bg-slate-100 hover:text-idm-blue transition-colors"
+      >
+        <span className="material-symbols-outlined text-[22px]">
+          {sidebarOpen ? "menu_open" : "menu"}
+        </span>
+      </button>
+
       <div className="flex items-center gap-3 ml-auto">
         <NotificationBell onNavigate={(item) => {
           const type = item?.type;

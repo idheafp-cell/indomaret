@@ -11,7 +11,6 @@ import SectionCard from "../components/ui/SectionCard";
 import KpiCard from "../components/ui/KpiCard";
 import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
-import Sparkline from "../components/ui/Sparkline";
 import Pagination from "../components/ui/Pagination";
 import usePaginatedRows from "../hooks/usePaginatedRows";
 import { Field, InputShell, inputClass } from "../components/ui/InputShell";
@@ -20,14 +19,8 @@ import { getStoresMap, listStores, listRegencies, createStore } from "../api/res
 import { formatRupiah } from "../lib/format";
 import { storeDot, clusterIcon } from "../components/map/MapMarkerIcon";
 import StorePopupCard from "../components/map/StorePopupCard";
-import HeatmapLayer from "../components/map/HeatmapLayer";
 
 const ZONE_COLORS = ["#005baa", "#d61c24", "#fdb813", "#334155", "#0ea5e9", "#7c3aed"];
-
-// Gradasi heatmap disamakan dengan palet Indomaret (biru -> cyan -> kuning ->
-// merah) supaya konsisten dengan warna yang dipakai di tempat lain, bukan
-// gradasi biru-hijau-kuning-merah bawaan leaflet.heat yang tidak senada.
-const HEAT_GRADIENT = { 0.15: "#005baa", 0.4: "#0ea5e9", 0.7: "#fdb813", 1: "#d61c24" };
 
 // Stop warna choropleth buat batas kecamatan (tab "Wilayah Kecamatan"): hijau
 // (pemasukan rendah) -> kuning -> merah (pemasukan TERTINGGI se-kota) --
@@ -61,7 +54,6 @@ const PEMASUKAN_GRADIENT_CSS = `linear-gradient(to right, ${PEMASUKAN_COLOR_STOP
 const TABS = [
   { key: "semua", label: "Semua Gerai", icon: "location_on" },
   { key: "kecamatan", label: "Wilayah Kecamatan", icon: "workspaces" },
-  { key: "heatmap", label: "Heatmap Omset", icon: "local_fire_department" },
 ];
 
 // Nama kecamatan di data gerai (input manual/hasil ekstrak alamat) kadang beda
@@ -98,9 +90,145 @@ function emptyZonePopupHtml(namaResmi) {
   );
 }
 
+function tanggalPendek(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
+}
+
+// Bar chart pemasukan vs pengeluaran per hari -- gaya sama persis dengan
+// popup satu gerai (StorePopupCard), dipakai di popup kecamatan yang
+// datanya 14 hari (dua kali lipat gerai). Label tanggal per-bar sengaja
+// dihilangkan (kepadatan 14 bar berdampingan kalau dikasih teks jadi
+// numpuk), diganti tooltip <title> per bar + badge rentang tanggal di judul.
+function niceAxisStep(rawMax, divisions) {
+  // Bikin batas atas & jarak antar-garis sumbu-y yang "bulat" (kayak
+  // penggaris: 0, 5, 10, 15) -- bukan pecahan dari nilai maksimum data
+  // aktual yang seringkali ganjil dan nggak enak dibaca.
+  if (!isFinite(rawMax) || rawMax <= 0) return { step: 1, niceMax: divisions };
+  const roughStep = rawMax / divisions;
+  const exponent = Math.floor(Math.log10(roughStep));
+  const fraction = roughStep / Math.pow(10, exponent);
+  let niceFraction;
+  if (fraction <= 1) niceFraction = 1;
+  else if (fraction <= 2) niceFraction = 2;
+  else if (fraction <= 5) niceFraction = 5;
+  else niceFraction = 10;
+  const step = niceFraction * Math.pow(10, exponent);
+  return { step, niceMax: step * divisions };
+}
+
+function ZoneTrenChart({ agg }) {
+  const width = 300;
+  const height = 172;
+  const padX = 42; // ruang buat label angka sumbu-y di kiri, sekalian jadi
+  // jarak aman tepi kiri/kanan biar titik hari pertama/terakhir nggak nempel
+  // garis tepi SVG (separuh lingkarannya kepotong).
+  const padTop = 14;
+  const plotBottom = height - 26; // sisa di bawah ini buat garis sumbu-x + label tanggal
+  const count = agg.length;
+  const stepX = count > 1 ? (width - padX - 12) / (count - 1) : width - padX - 12;
+
+  // Skala tiap garis dihitung SENDIRI-SENDIRI (pemasukan vs pengeluaran) --
+  // pemasukan biasanya jauh lebih besar, kalau dipaksa 1 skala garis
+  // pengeluaran bakal keliatan rata terus di bawah. Batas atasnya dibulatkan
+  // lewat niceAxisStep supaya angka di sumbu-y jadi kelipatan rapi
+  // (0, 5, 10, 15, ...), bukan pecahan ganjil dari nilai maksimum aktual.
+  // min selalu dikunci ke 0, jadi plotBottom = 0 buat KEDUA garis.
+  const DIVISIONS = 3;
+  const rawMaxPemasukan = Math.max(1, ...agg.map((p) => p.pemasukan));
+  const rawMaxPengeluaran = Math.max(1, ...agg.map((p) => p.pengeluaran));
+  const { niceMax: maxPemasukan } = niceAxisStep(rawMaxPemasukan, DIVISIONS);
+  const { niceMax: maxPengeluaran } = niceAxisStep(rawMaxPengeluaran, DIVISIONS);
+
+  function seriesPoints(key, max) {
+    return agg.map((p, i) => ({
+      x: padX + i * stepX,
+      y: plotBottom - (p[key] / max) * (plotBottom - padTop),
+      v: p[key],
+    }));
+  }
+
+  const seriesList = [
+    { key: "pemasukan", color: "#145fa0", max: maxPemasukan },
+    { key: "pengeluaran", color: "#bf3339", max: maxPengeluaran },
+  ];
+
+  // Label tanggal di sumbu-x: cuma sebagian (bukan ke-14 harinya) supaya
+  // nggak numpuk -- hari pertama, ~tiap 1/3 jalan, dan hari terakhir.
+  const tickIdx = count > 1
+    ? Array.from(new Set([0, Math.round((count - 1) / 3), Math.round(((count - 1) * 2) / 3), count - 1]))
+    : [0];
+
+  // Sumbu-y kiri digambar rapi kayak penggaris: garis vertikal + tanda
+  // strip pendek (tick) di tiap level, jaraknya sama rata (0, 1/3, 2/3, 1
+  // dari niceMax) supaya angkanya jadi rentang bulat, misal 0/5/10/15.
+  const yTicks = Array.from({ length: DIVISIONS + 1 }, (_, i) => i / DIVISIONS);
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Tren pemasukan vs pengeluaran 14 hari">
+      {yTicks.map((t) => {
+        const y = plotBottom - t * (plotBottom - padTop);
+        return (
+          <g key={`grid-${t}`}>
+            <line x1={padX} x2={width - 8} y1={y} y2={y} stroke="#eef2f6" strokeWidth="1" strokeDasharray="2 3" />
+            <line x1={padX - 4} x2={padX} y1={y} y2={y} stroke="#94a3b8" strokeWidth="1" />
+          </g>
+        );
+      })}
+
+      {/* Angka sumbu-y: level "0" cukup 1 angka netral (dipakai bareng,
+          karena kedua garis sama-sama mulai dari 0). Level di atasnya
+          dikasih 2 angka (biru & merah) dengan jarak baris yang lega. */}
+      <text x={padX - 8} y={plotBottom + 2.5} fontSize="7.5" fontWeight="700" fill="#94a3b8" textAnchor="end">
+        0
+      </text>
+      {yTicks.filter((t) => t > 0).map((t) => {
+        const y = plotBottom - t * (plotBottom - padTop);
+        return (
+          <g key={`label-${t}`}>
+            <text x={padX - 8} y={y - 3} fontSize="7.5" fontWeight="700" fill="#145fa0" textAnchor="end">
+              {formatRupiah(t * maxPemasukan, { compact: true })}
+            </text>
+            <text x={padX - 8} y={y + 9} fontSize="7.5" fontWeight="700" fill="#bf3339" textAnchor="end">
+              {formatRupiah(t * maxPengeluaran, { compact: true })}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Bingkai sumbu: garis kiri (sumbu-y) & garis bawah (sumbu-x). */}
+      <line x1={padX} x2={padX} y1={padTop} y2={plotBottom} stroke="#cbd5e1" strokeWidth="1" />
+      <line x1={padX} x2={width - 8} y1={plotBottom} y2={plotBottom} stroke="#cbd5e1" strokeWidth="1" />
+
+      {/* Label tanggal di sumbu-x */}
+      {tickIdx.map((i) => (
+        <text key={i} x={padX + i * stepX} y={plotBottom + 13} fontSize="7.5" fill="#94a3b8" textAnchor="middle">
+          {tanggalPendek(agg[i].tanggal)}
+        </text>
+      ))}
+
+      {seriesList.map(({ key, color, max }) => {
+        const points = seriesPoints(key, max);
+        const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+        return (
+          <g key={key}>
+            <path d={d} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            {points.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="1.75" fill={color}>
+                <title>{`${tanggalPendek(agg[i].tanggal)} — ${formatRupiah(p.v, { compact: true })}`}</title>
+              </circle>
+            ))}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 function ZonePopupContent({ zone, totalKota }) {
   const days = zone.list[0]?.daily_trend?.length || 0;
   const agg = Array.from({ length: days }, (_, i) => ({
+    tanggal: zone.list[0]?.daily_trend?.[i]?.date,
     pemasukan: zone.list.reduce((s, g) => s + (g.daily_trend?.[i]?.income || 0), 0),
     pengeluaran: zone.list.reduce((s, g) => s + (g.daily_trend?.[i]?.expense || 0), 0),
   }));
@@ -110,7 +238,7 @@ function ZonePopupContent({ zone, totalKota }) {
     .slice(0, 3);
 
   return (
-    <div className="text-sm w-[228px]">
+    <div className="text-sm w-[340px]">
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: zone.color }} />
         <span className="font-extrabold text-[13.5px] text-slate-900 flex-1 truncate">Kec. {zone.nama}</span>
@@ -170,23 +298,27 @@ function ZonePopupContent({ zone, totalKota }) {
 
       {agg.length > 1 && (
         <div className="mt-2.5 pt-2.5 border-t border-slate-200">
-          <div className="text-[10px] text-slate-500 font-semibold mb-1">Tren gabungan 14 hari terakhir</div>
-          <div className="flex items-center gap-3 text-[9px] text-slate-500 font-semibold mb-1">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="text-[10px] text-slate-500 font-semibold">Tren gabungan 14 hari terakhir</div>
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold whitespace-nowrap">
+              {tanggalPendek(agg[0].tanggal)} – {tanggalPendek(agg[agg.length - 1].tanggal)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[9px] text-slate-500 font-semibold mb-1.5">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-sm bg-idm-blue" /> Pemasukan
+              <span className="text-idm-blue font-extrabold">
+                {formatRupiah(agg.reduce((s, p) => s + p.pemasukan, 0), { compact: true })}
+              </span>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-sm bg-idm-red" /> Pengeluaran
+              <span className="text-idm-red font-extrabold">
+                {formatRupiah(agg.reduce((s, p) => s + p.pengeluaran, 0), { compact: true })}
+              </span>
             </span>
           </div>
-          <Sparkline
-            series={[
-              { label: "pemasukan", color: "#005baa", points: agg.map((p) => p.pemasukan) },
-              { label: "pengeluaran", color: "#d61c24", points: agg.map((p) => p.pengeluaran) },
-            ]}
-            width={220}
-            height={46}
-          />
+          <ZoneTrenChart agg={agg} />
         </div>
       )}
     </div>
@@ -207,6 +339,14 @@ export default function Peta() {
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState(emptyForm());
   const [kecamatanBoundaries, setKecamatanBoundaries] = useState(null);
+
+  // Kontrol tampilan peta (panel melayang di pojok peta): filter kecamatan
+  // mana yang ditampilkan & toggle tampil/sembunyikan marker gerai. State
+  // ini KHUSUS buat peta -- terpisah dari pencarian/filter kecamatan tabel
+  // master di bawah peta (search, kecamatanFilter) yang sudah ada duluan.
+  const [showGeraiMarkers, setShowGeraiMarkers] = useState(true);
+  const [excludedKecamatan, setExcludedKecamatan] = useState(() => new Set());
+  const [mapControlOpen, setMapControlOpen] = useState(false);
   // Ref instance peta Leaflet (buat zoom/pan terprogram dari luar, misal
   // klik baris tabel di bawah) & ref elemen pembungkus peta (buat
   // scroll-ke-peta kalau tabelnya lagi di luar layar). Lihat handleLocateOnMap.
@@ -245,8 +385,8 @@ export default function Peta() {
       .catch(() => setKecamatanBoundaries(null));
   }, [isManager]);
 
-  // Tab wilayah & heatmap keduanya berbasis angka omset, jadi hanya berguna
-  // (dan hanya boleh) untuk manager. Supervisor cukup tab "Semua Gerai".
+  // Tab wilayah berbasis angka omset, jadi hanya berguna (dan hanya boleh)
+  // untuk manager. Supervisor cukup tab "Semua Gerai".
   const visibleTabs = useMemo(() => (isManager ? TABS : TABS.filter((t) => t.key === "semua")), [isManager]);
   const activeTab = visibleTabs.some((t) => t.key === tab) ? tab : "semua";
 
@@ -309,37 +449,45 @@ export default function Peta() {
       .sort((a, b) => b.list.length - a.list.length);
   }, [gerai]);
 
+  // Daftar nama kecamatan buat checklist panel kontrol peta, diurutkan A-Z
+  // (beda dari kecamatanGroups yang diurutkan dari jumlah gerai terbanyak).
+  const mapKecamatanList = useMemo(
+    () => kecamatanGroups.map((z) => z.nama).sort((a, b) => a.localeCompare(b, "id")),
+    [kecamatanGroups]
+  );
+
+  function toggleKecamatanVisibility(nama) {
+    setExcludedKecamatan((prev) => {
+      const next = new Set(prev);
+      if (next.has(nama)) next.delete(nama);
+      else next.add(nama);
+      return next;
+    });
+  }
+
+  // Gerai & kecamatan yang BENERAN ditampilkan di peta setelah difilter
+  // panel kontrol -- dipakai buat marker/boundary peta, TIDAK memengaruhi
+  // tabel master/daftar kecamatan di bawah peta yang punya filter sendiri.
+  const visibleGerai = useMemo(
+    () => gerai.filter((g) => !excludedKecamatan.has(g.district || "Belum diketahui")),
+    [gerai, excludedKecamatan]
+  );
+  const visibleKecamatanGroups = useMemo(
+    () => kecamatanGroups.filter((z) => !excludedKecamatan.has(z.nama)),
+    [kecamatanGroups, excludedKecamatan]
+  );
+
   // Skala tertinggi buat warna dot toko per-GERAI (bukan per-kecamatan) di
-  // tab "Wilayah Kecamatan" & "Heatmap Omset" -- lihat pemakaiannya di bawah.
+  // tab "Wilayah Kecamatan" -- lihat pemakaiannya di bawah.
   const maxStoreOmset = Math.max(1, ...gerai.map((g) => g.total_income_this_month || 0));
 
-  // Kecamatan dengan total pemasukan tertinggi -- dipakai buat skala
-  // heatmap (bukan gerai satuan tertinggi seperti sebelumnya) & ditampilkan
-  // di legenda.
+  // Kecamatan dengan total pemasukan tertinggi -- ditampilkan di legenda
+  // tab "Wilayah Kecamatan".
   const topKecamatanOmset = useMemo(
     () => kecamatanGroups.reduce((top, z) => (!top || z.totalPemasukan > top.totalPemasukan ? z : top), null),
     [kecamatanGroups]
   );
   const maxKecamatanOmset = Math.max(1, topKecamatanOmset?.totalPemasukan || 0);
-
-  // Titik untuk leaflet.heat: [lat, lng, intensitas 0..1]. Intensitas tiap
-  // gerai SENGAJA diambil dari total pemasukan KECAMATANNYA (bukan omset
-  // gerai itu sendiri) -- user minta heatmap-nya menunjukkan wilayah mana
-  // yang omsetnya paling tinggi secara keseluruhan, bukan gerai satuan mana
-  // yang paling laris. Karena semua gerai dalam 1 kecamatan dapat intensitas
-  // yang SAMA (senilai total kecamatannya), titik-titik yang berdekatan
-  // secara geografis (memang cenderung 1 kecamatan) saling menumpuk jadi 1
-  // "gumpalan panas" yang mewakili kecamatan itu secara utuh, bukan
-  // titik-titik terpisah yang masing-masing terang/redup sendiri-sendiri.
-  // Lantai 0.06 (bukan 0) supaya kecamatan dengan omset kecil/nol tetap
-  // kelihatan sebagai bercak samar, bukan hilang sama sekali dari peta.
-  const heatPoints = useMemo(() => {
-    const totalByKecamatan = new Map(kecamatanGroups.map((z) => [z.nama, z.totalPemasukan]));
-    return gerai.map((g) => {
-      const totalKecamatan = totalByKecamatan.get(g.district || "Belum diketahui") || 0;
-      return [g.latitude, g.longitude, Math.max(0.06, totalKecamatan / maxKecamatanOmset)];
-    });
-  }, [gerai, kecamatanGroups, maxKecamatanOmset]);
 
   const halamanKecamatan = usePaginatedRows(kecamatanGroups, 10);
 
@@ -378,7 +526,10 @@ export default function Peta() {
     // popup -- didefinisikan di bawah fungsi ini tapi aman dibaca di sini
     // karena isi fungsi baru benar-benar jalan nanti (saat GeoJSON dirender),
     // bukan saat fungsi ini dideklarasikan.
-    layer.bindPopup(zone ? zonePopupHtml(zone, totalPemasukanBulanIni) : emptyZonePopupHtml(namaResmi));
+    layer.bindPopup(
+      zone ? zonePopupHtml(zone, totalPemasukanBulanIni) : emptyZonePopupHtml(namaResmi),
+      zone ? { maxWidth: 360, minWidth: 340 } : undefined
+    );
   }
 
   // Untuk supervisor, gerai lain dikirim tanpa angka (null) — jadi total di
@@ -488,11 +639,79 @@ export default function Peta() {
             ))}
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
-            <span className="w-2.5 h-2.5 rounded-full bg-idm-blue" /> Total Gerai Ditampilkan ({gerai.length})
+            <span className="w-2.5 h-2.5 rounded-full bg-idm-blue" /> Total Gerai Ditampilkan (
+            {showGeraiMarkers ? visibleGerai.length : 0})
           </div>
         </div>
 
         <div ref={mapSectionRef} className="w-full h-[520px] rounded-xl overflow-hidden border border-border-subtle relative">
+          {!loading && (
+            <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMapControlOpen((o) => !o)}
+                className="w-10 h-10 rounded-xl bg-white shadow-md border border-border-subtle flex items-center justify-center text-idm-blue hover:bg-slate-50 transition-colors"
+                title="Filter tampilan peta"
+              >
+                <span className="material-symbols-outlined text-[20px]">{mapControlOpen ? "close" : "tune"}</span>
+              </button>
+
+              {mapControlOpen && (
+                <div className="w-64 max-h-[420px] overflow-y-auto rounded-xl bg-white shadow-lg border border-border-subtle p-3.5 flex flex-col gap-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                    Kontrol Peta
+                  </span>
+
+                  <label className="flex items-center justify-between gap-2 cursor-pointer">
+                    <span className="text-[13px] font-semibold text-on-surface">Tampilkan gerai Indomaret</span>
+                    <input
+                      type="checkbox"
+                      checked={showGeraiMarkers}
+                      onChange={(e) => setShowGeraiMarkers(e.target.checked)}
+                      className="w-4 h-4 accent-idm-blue"
+                    />
+                  </label>
+
+                  <div className="border-t border-border-subtle pt-2.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                        Kecamatan
+                      </span>
+                      <div className="flex items-center gap-2 text-[11px] font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setExcludedKecamatan(new Set())}
+                          className="text-idm-blue hover:underline"
+                        >
+                          Semua
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExcludedKecamatan(new Set(mapKecamatanList))}
+                          className="text-text-muted hover:underline"
+                        >
+                          Kosongkan
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {mapKecamatanList.map((nama) => (
+                        <label key={nama} className="flex items-center gap-2 cursor-pointer py-0.5">
+                          <input
+                            type="checkbox"
+                            checked={!excludedKecamatan.has(nama)}
+                            onChange={() => toggleKecamatanVisibility(nama)}
+                            className="w-3.5 h-3.5 accent-idm-blue shrink-0"
+                          />
+                          <span className="text-[12.5px] text-on-surface-variant truncate">{nama}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-text-muted text-sm">
               Memuat peta...
@@ -506,11 +725,11 @@ export default function Peta() {
 
               {/* Clustering cuma untuk tab "Semua Gerai" -- ini yang paling
                   sering numpuk kalau banyak gerai berdekatan/zoom kecil.
-                  Tab kecamatan & heatmap tidak di-cluster (posisinya memang
+                  Tab kecamatan tidak di-cluster (posisinya memang
                   representatif per wilayah), tapi ikon toko individunya
-                  (storeDot) SAMA persis di ketiga tab supaya gaya markernya
+                  (storeDot) SAMA persis di kedua tab supaya gaya markernya
                   konsisten di seluruh peta ini. */}
-              {activeTab === "semua" && (
+              {activeTab === "semua" && showGeraiMarkers && (
                 <MarkerClusterGroup
                   chunkedLoading
                   maxClusterRadius={60}
@@ -523,7 +742,7 @@ export default function Peta() {
                   spiderLegPolylineOptions={{ color: "#005baa", weight: 1.5, opacity: 0.6 }}
                   iconCreateFunction={(cluster) => clusterIcon(cluster.getChildCount())}
                 >
-                  {gerai.map((g) => (
+                  {visibleGerai.map((g) => (
                     <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot("#005baa")}>
                       <Popup maxWidth={444} minWidth={404}>
                         <StorePopupCard gerai={g} />
@@ -536,64 +755,47 @@ export default function Peta() {
               {activeTab === "kecamatan" && (
                 <>
                   {/* Batas kecamatan asli (bukan lagi lingkaran perkiraan) --
-                      key diikat ke jumlah gerai supaya layer di-mount ulang
-                      kalau datanya berubah (style/popup GeoJSON di react-leaflet
-                      "dibekukan" saat layer pertama dibuat, tidak auto-update). */}
+                      key diikat ke jumlah gerai & filter kecamatan aktif
+                      supaya layer di-mount ulang kalau datanya/filter-nya
+                      berubah (style/popup/filter GeoJSON di react-leaflet
+                      "dibekukan" saat layer pertama dibuat, tidak auto-
+                      update). Kecamatan yang di-nonaktifkan dari panel
+                      kontrol peta disaring lewat prop filter, jadi batasnya
+                      ikut hilang sama seperti marker gerainya. */}
                   {kecamatanBoundaries && (
                     <GeoJSON
-                      key={`kec-boundaries-${gerai.length}`}
+                      key={`kec-boundaries-${gerai.length}-${excludedKecamatan.size}-${Array.from(excludedKecamatan).sort().join("|")}`}
                       data={kecamatanBoundaries}
                       style={kecamatanBoundaryStyle}
                       onEachFeature={onEachKecamatanFeature}
+                      filter={(feature) => {
+                        const zone = zoneByNormalizedName.get(normalizeKecamatan(feature.properties.kecamatan));
+                        return !zone || !excludedKecamatan.has(zone.nama);
+                      }}
                     />
                   )}
                   {/* Warna dot toko di sini gradasi mengikuti omset GERAI itu
                       sendiri (hijau = rendah, merah = tertinggi, sama skala
                       warna dengan batas kecamatan di atas) -- BUKAN warna
-                      identitas kecamatan (zone.color) lagi. */}
-                  {kecamatanGroups.map((zone) =>
-                    zone.list.map((g) => {
-                      const color = pemasukanColorScale((g.total_income_this_month || 0) / maxStoreOmset);
-                      return (
-                        <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot(color)}>
-                          <Popup maxWidth={444} minWidth={404}>
-                            <StorePopupCard gerai={g} />
-                          </Popup>
-                        </Marker>
-                      );
-                    })
-                  )}
+                      identitas kecamatan (zone.color) lagi. Ikut toggle
+                      "tampilkan gerai" & filter kecamatan dari panel kontrol
+                      peta (visibleKecamatanGroups). */}
+                  {showGeraiMarkers &&
+                    visibleKecamatanGroups.map((zone) =>
+                      zone.list.map((g) => {
+                        const color = pemasukanColorScale((g.total_income_this_month || 0) / maxStoreOmset);
+                        return (
+                          <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot(color)}>
+                            <Popup maxWidth={444} minWidth={404}>
+                              <StorePopupCard gerai={g} />
+                            </Popup>
+                          </Marker>
+                        );
+                      })
+                    )}
                 </>
               )}
 
-              {activeTab === "heatmap" && (
-                <>
-                  {/* Blob panas berbasis WILAYAH (total pemasukan gabungan
-                      se-kecamatan, lihat heatPoints), BUKAN omset gerai
-                      satuan. Radius & blur sengaja lebih besar dari default
-                      leaflet.heat supaya titik-titik gerai yang berdekatan
-                      (biasanya memang 1 kecamatan) melebur jadi 1 gumpalan
-                      wilayah yang menyatu, bukan bintik-bintik kecil
-                      terpisah per toko. */}
-                  <HeatmapLayer points={heatPoints} gradient={HEAT_GRADIENT} radius={48} blur={34} />
-                  {/* Titik toko (storeDot, sama seperti 2 tab lain) di atas
-                      heat layer -- cuma target klik buat buka popup detail
-                      gerai. Warnanya gradasi mengikuti omset GERAI itu
-                      sendiri (hijau = rendah, merah = tertinggi, skala sama
-                      dengan tab "Wilayah Kecamatan"), beda dari gumpalan
-                      panas di bawahnya yang basisnya per wilayah. */}
-                  {gerai.map((g) => {
-                    const color = pemasukanColorScale((g.total_income_this_month || 0) / maxStoreOmset);
-                    return (
-                      <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot(color)}>
-                        <Popup maxWidth={444} minWidth={404}>
-                          <StorePopupCard gerai={g} />
-                        </Popup>
-                      </Marker>
-                    );
-                  })}
-                </>
-              )}
             </MapContainer>
           )}
         </div>
@@ -617,26 +819,6 @@ export default function Peta() {
           </div>
         )}
 
-        {activeTab === "heatmap" && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <div className="flex items-center gap-2.5">
-              <span className="text-[11px] font-semibold text-text-muted">Wilayah sepi</span>
-              <span
-                className="h-2.5 w-32 rounded-full shadow-inner"
-                style={{
-                  background: `linear-gradient(to right, ${HEAT_GRADIENT[0.15]}, ${HEAT_GRADIENT[0.4]}, ${HEAT_GRADIENT[0.7]}, ${HEAT_GRADIENT[1]})`,
-                }}
-              />
-              <span className="text-[11px] font-semibold text-text-muted">Wilayah omset tertinggi</span>
-            </div>
-            <span className="text-[11px] text-text-muted">
-              Panas dihitung per <strong className="text-on-surface">kecamatan</strong> (total pemasukan gabungan
-              seluruh gerainya). Wilayah tertinggi bulan ini:{" "}
-              <strong className="text-on-surface">{topKecamatanOmset?.nama || "-"}</strong> (
-              {formatRupiah(maxKecamatanOmset, { compact: true })})
-            </span>
-          </div>
-        )}
       </SectionCard>
 
       {isManager && activeTab === "kecamatan" && (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import TopAccentBar from "./TopAccentBar";
 import Sidebar from "./Sidebar";
@@ -7,6 +8,16 @@ import { useAuth } from "../../context/AuthContext";
 export default function AppLayout() {
   const { user, loading, isManager, isCashier } = useAuth();
   const { pathname } = useLocation();
+
+  // Sidebar bisa disembunyikan (slide-out) supaya konten utama bisa full-
+  // width kalau perlu. SELALU mulai kebuka tiap kali aplikasi dibuka/di-
+  // refresh (bukan diingat dari sesi sebelumnya) -- nutupnya cuma berlaku
+  // sementara di sesi yang sedang berjalan.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  function toggleSidebar() {
+    setSidebarOpen((prev) => !prev);
+  }
 
   if (loading) {
     return (
@@ -46,9 +57,13 @@ export default function AppLayout() {
   return (
     <>
       <TopAccentBar />
-      <Sidebar />
-      <div className="pl-[18rem]">
-        <Header />
+      <Sidebar open={sidebarOpen} />
+      <div
+        className={`transition-[padding-left] duration-300 ease-in-out ${
+          sidebarOpen ? "pl-[18rem]" : "pl-0"
+        }`}
+      >
+        <Header sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
         <main className="w-full bg-slate-50/60 min-h-screen px-6 pb-6 pt-[calc(4.5rem+0.375rem+1.5rem)]">
           <div className="flex flex-col w-full gap-6 max-w-[1600px] mx-auto">
             <Outlet />

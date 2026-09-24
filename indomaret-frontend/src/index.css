@@ -3,17 +3,20 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand colors - dari DESIGN.md & export Stitch (Retail Ops Enterprise) */
-  --color-idm-blue: #005baa;
-  --color-idm-blue-dark: #004481;
-  --color-idm-blue-light: #e7eeff;
-  --color-idm-red: #d61c24;
-  --color-idm-red-dark: #ba1a1a;
-  --color-idm-red-light: #ffdad6;
-  --color-idm-yellow: #fdb813;
-  --color-idm-yellow-light: #fff3cc;
+  /* Brand colors - versi soft/muted dari warna asli Indomaret (biru/merah/
+     kuning tetap dipertahankan huenya, cuma saturasi & lightness diturunkan
+     supaya nggak terlalu "warna-warni" di seluruh halaman). Warna asli:
+     #005baa / #d61c24 / #fdb813. */
+  --color-idm-blue: #145fa0;
+  --color-idm-blue-dark: #0f4677;
+  --color-idm-blue-light: #ecf0fa;
+  --color-idm-red: #bf3339;
+  --color-idm-red-dark: #a62e2e;
+  --color-idm-red-light: #f6e1df;
+  --color-idm-yellow: #e1a81f;
+  --color-idm-yellow-light: #f4edd7;
 
-  --color-primary: #005baa;
+  --color-primary: #145fa0;
   --color-on-primary: #ffffff;
 
   --color-surface: #f8fafc;

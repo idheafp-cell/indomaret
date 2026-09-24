@@ -72,7 +72,7 @@ const ROLE_TITLE = {
   cashier: "Kasir Gerai",
 };
 
-export default function Sidebar() {
+export default function Sidebar({ open }) {
   const { user, isManager, isCashier } = useAuth();
 
   let items = navItems;
@@ -82,7 +82,11 @@ export default function Sidebar() {
   const storeLabel = user?.store?.name || (isManager ? "DC Waru Surabaya" : "Gerai Anda");
 
   return (
-    <aside className="fixed left-0 top-1.5 h-[calc(100%-0.375rem)] w-[18rem] bg-white border-r border-border-subtle z-50 flex flex-col justify-between shadow-[2px_0_12px_rgba(0,91,170,0.03)]">
+    <aside
+      className={`fixed left-0 top-1.5 h-[calc(100%-0.375rem)] w-[18rem] bg-white border-r border-border-subtle z-50 flex flex-col justify-between shadow-[2px_0_12px_rgba(0,91,170,0.03)] transition-transform duration-300 ease-in-out ${
+        open ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       <div className="flex flex-col">
         <div className="h-[4.5rem] px-6 flex items-center gap-3 border-b border-border-subtle/80">
           <div className="flex items-center gap-2.5">

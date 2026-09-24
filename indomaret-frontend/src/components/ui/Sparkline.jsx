@@ -5,18 +5,23 @@
  */
 export default function Sparkline({ series, width = 220, height = 60, className = "" }) {
   // series: [{ label, color, points: number[] }]
-  const allValues = series.flatMap((s) => s.points);
-  const max = Math.max(1, ...allValues);
-  const min = Math.min(0, ...allValues);
-  const range = max - min || 1;
+  // Skala TIAP series dihitung SENDIRI-SENDIRI (bukan 1 skala global
+  // gabungan seperti sebelumnya) -- soalnya nilai pemasukan biasanya jauh
+  // lebih besar dari pengeluaran, kalau dipaksa 1 skala yang nilainya jauh
+  // lebih kecil bakal keliatan rata/datar terus di bawah (seolah nggak ada
+  // pergerakan/informasi sama sekali, padahal datanya sebenarnya bergerak).
   const count = series[0]?.points.length || 0;
   const stepX = count > 1 ? width / (count - 1) : width;
+  const padY = height * 0.08; // jarak tipis biar puncak/lembah garis nggak nempel tepi atas/bawah
 
   function toPath(points) {
+    const max = Math.max(1, ...points);
+    const min = Math.min(0, ...points);
+    const range = max - min || 1;
     return points
       .map((v, i) => {
         const x = i * stepX;
-        const y = height - ((v - min) / range) * height;
+        const y = height - padY - ((v - min) / range) * (height - padY * 2);
         return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(" ");
