@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Master data kabupaten/kota. Sesuai kebutuhan, sistem ini fokus untuk
+     * satu kabupaten, tapi dibuat sebagai tabel master supaya fleksibel
+     * jika suatu saat cakupan bertambah ke kabupaten lain.
+     */
+    public function up(): void
+    {
+        Schema::create('kabupatens', function (Blueprint $table) {
+            $table->id();
+            $table->string('nama');
+            $table->string('provinsi')->nullable();
+            $table->timestamps();
+
+            $table->unique(['nama', 'provinsi']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('kabupatens');
+    }
+};

@@ -1,0 +1,53 @@
+services:
+  backend:
+    build:
+      context: ./indomaret-backend
+    container_name: indomaret_backend
+    restart: unless-stopped
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      DB_DATABASE: indomaret
+      DB_USERNAME: postgres
+      DB_PASSWORD: admin
+      APP_URL: http://localhost:8000
+      RUN_SEEDER: "false"
+      PHP_CLI_SERVER_WORKERS: 4
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000", "--no-reload"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./indomaret-backend:/var/www/html
+      # vendor/ dipisah ke volume Docker sendiri (BUKAN ikut bind-mount
+      # polos dari D: Windows) -- ini penyebab utama tiap request lambat
+      # (termasuk /api/login 17-26 detik): PHP/Composer autoload baca
+      # RIBUAN file kecil di vendor/ tiap request, dan Docker Desktop di
+      # Windows (WSL2) terkenal lambat banget untuk baca-tulis file lewat
+      # bind-mount ke drive Windows. Dengan vendor/ di volume Docker
+      # (filesystem Linux asli), baca file jadi jauh lebih cepat. Volume
+      # kosong ini otomatis keisi dari vendor/ hasil "composer install"
+      # waktu build image (perilaku bawaan Docker: named volume kosong
+      # di-seed dari isi image pas pertama kali dipakai).
+      - indomaret_backend_vendor:/var/www/html/vendor
+
+  frontend:
+    build:
+      context: ./indomaret-frontend
+    container_name: indomaret_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./indomaret-frontend:/app
+      # node_modules dipisah ke volume sendiri -- lihat penjelasan di
+      # indomaret-frontend/Dockerfile kenapa ini penting di Windows.
+      - indomaret_frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  indomaret_frontend_node_modules:
+  indomaret_backend_vendor:

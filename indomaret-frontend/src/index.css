@@ -1,0 +1,110 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors - dari DESIGN.md & export Stitch (Retail Ops Enterprise) */
+  --color-idm-blue: #005baa;
+  --color-idm-blue-dark: #004481;
+  --color-idm-blue-light: #e7eeff;
+  --color-idm-red: #d61c24;
+  --color-idm-red-dark: #ba1a1a;
+  --color-idm-red-light: #ffdad6;
+  --color-idm-yellow: #fdb813;
+  --color-idm-yellow-light: #fff3cc;
+
+  --color-primary: #005baa;
+  --color-on-primary: #ffffff;
+
+  --color-surface: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f5f9;
+  --color-surface-container: #e2e8f0;
+  --color-surface-container-high: #cbd5e1;
+
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475467;
+  --color-text-muted: #64748b;
+  --color-border-subtle: #e2e8f0;
+
+  --color-success-soft: #dcfce7;
+  --color-text-success: #15803d;
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 18px;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-headline-sm: 16px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-sm--font-weight: 600;
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 700;
+  --text-headline-lg: 26px;
+  --text-headline-lg--line-height: 34px;
+  --text-headline-lg--font-weight: 700;
+  --text-title-stat: 26px;
+  --text-title-stat--line-height: 32px;
+  --text-title-stat--font-weight: 700;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Plus Jakarta Sans", sans-serif;
+  }
+  body {
+    overscroll-behavior: none;
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 500,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+/* Leaflet map container needs an explicit stacking context so it doesn't
+   sit above our modals/header */
+.leaflet-container {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  z-index: 0;
+}
+
+/* Pop-up gerai di peta memuat kartu ringkasan yang cukup lebar (KPI + tab +
+   grafik), jadi padding bawaan Leaflet dikecilkan & sudutnya disamakan
+   dengan kartu lain di aplikasi. */
+.leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px;
+  line-height: 1.35;
+}
+
+.leaflet-popup-content p {
+  margin: 0;
+}

@@ -1,0 +1,237 @@
+{
+  "info": {
+    "name": "Dashboard Indomaret - API",
+    "description": "Koleksi Postman untuk backend Laravel Dashboard Indomaret.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000/api" },
+    { "key": "token", "value": "" },
+    { "key": "kabupaten_id", "value": "1" },
+    { "key": "indomaret_id", "value": "1" },
+    { "key": "kategori_id", "value": "1" },
+    { "key": "employee_id", "value": "1" },
+    { "key": "user_id", "value": "1" },
+    { "key": "pengeluaran_id", "value": "1" },
+    { "key": "pemasukan_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@indomaret-dashboard.test\",\n  \"password\": \"password123\",\n  \"device_name\": \"postman\"\n}"
+            },
+            "url": "{{base_url}}/login"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/me"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Peta",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/dashboard?start_date=2026-09-01&end_date=2026-09-30"
+          }
+        },
+        {
+          "name": "Peta Sebaran Indomaret",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/peta-sebaran"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Master - Kabupaten (manager)",
+      "item": [
+        {
+          "name": "List Kabupaten",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/kabupaten" }
+        },
+        {
+          "name": "Create Kabupaten",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Kabupaten Sidoarjo\",\n  \"provinsi\": \"Jawa Timur\"\n}" },
+            "url": "{{base_url}}/kabupaten"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Master - Indomaret",
+      "item": [
+        {
+          "name": "List Indomaret",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/indomaret" }
+        },
+        {
+          "name": "Create Indomaret (manager)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kabupaten_id\": {{kabupaten_id}},\n  \"kode_toko\": \"IDM-005\",\n  \"nama\": \"Indomaret Baru\",\n  \"alamat\": \"Jl. Contoh No. 1\",\n  \"kecamatan\": \"Sidoarjo\",\n  \"latitude\": -7.4478,\n  \"longitude\": 112.7183,\n  \"no_telp\": \"031-8945123\"\n}"
+            },
+            "url": "{{base_url}}/indomaret"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Master - Kategori Barang",
+      "item": [
+        {
+          "name": "List Kategori",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/kategori-barang" }
+        },
+        {
+          "name": "Create Kategori (manager)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Minuman\"\n}" },
+            "url": "{{base_url}}/kategori-barang"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Akun Supervisor (manager)",
+      "item": [
+        {
+          "name": "List Users",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/users" }
+        },
+        {
+          "name": "Create Supervisor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Supervisor Baru\",\n  \"email\": \"supervisor.baru@indomaret-dashboard.test\",\n  \"password\": \"password123\",\n  \"role\": \"supervisor\",\n  \"indomaret_id\": {{indomaret_id}}\n}"
+            },
+            "url": "{{base_url}}/users"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Karyawan / Kasir (supervisor)",
+      "item": [
+        {
+          "name": "List Karyawan",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/employees" }
+        },
+        {
+          "name": "Tambah Kasir",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Kasir Tiga\",\n  \"password\": \"kasir123\"\n}" },
+            "url": "{{base_url}}/employees"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pengeluaran Barang",
+      "item": [
+        {
+          "name": "List Pengeluaran",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/pengeluaran?start_date=2026-09-01&end_date=2026-09-30" }
+        },
+        {
+          "name": "Input Pengeluaran (oleh Supervisor sendiri)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kategori_barang_id\": {{kategori_id}},\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah_barang\": 20,\n  \"satuan\": \"pcs\",\n  \"nilai\": 250000,\n  \"keterangan\": \"Stok opname harian\"\n}"
+            },
+            "url": "{{base_url}}/pengeluaran"
+          }
+        },
+        {
+          "name": "Input Pengeluaran (oleh Kasir - butuh nama & password)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kategori_barang_id\": {{kategori_id}},\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah_barang\": 10,\n  \"nilai\": 120000,\n  \"employee_nama\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
+            },
+            "url": "{{base_url}}/pengeluaran"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pemasukan",
+      "item": [
+        {
+          "name": "List Pemasukan",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/pemasukan?start_date=2026-09-01&end_date=2026-09-30" }
+        },
+        {
+          "name": "Input Pemasukan (oleh Kasir)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah\": 3500000,\n  \"employee_nama\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
+            },
+            "url": "{{base_url}}/pemasukan"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Laporan PDF",
+      "item": [
+        {
+          "name": "Download Laporan Pengeluaran & Pemasukan",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/laporan/pengeluaran-pemasukan/pdf?indomaret_id={{indomaret_id}}&start_date=2026-09-01&end_date=2026-09-30"
+          }
+        }
+      ]
+    }
+  ]
+}
