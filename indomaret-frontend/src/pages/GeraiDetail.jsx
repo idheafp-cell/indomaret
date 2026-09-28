@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   getStore,
   updateStore,
+  deleteStore,
   getDashboard,
   listEmployees,
   createEmployee,
@@ -31,7 +32,7 @@ import {
 } from "../api/resources";
 import { formatRupiah, formatNumber, formatDate, todayISO } from "../lib/format";
 
-const CATEGORY_COLORS = ["#005baa", "#d61c24", "#fdb813", "#475569", "#0ea5e9", "#be123c", "#ca8a04"];
+const CATEGORY_COLORS = ["#145fa0", "#bf3339", "#e1a81f", "#475569", "#0ea5e9", "#be123c", "#ca8a04"];
 
 function firstDayOfMonth() {
   const d = new Date();
@@ -60,6 +61,7 @@ export default function GeraiDetail() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [inModalOpen, setInModalOpen] = useState(false);
   const [outModalOpen, setOutModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const canManageStore = isManager;
   const isOwnStore = isSupervisor && Number(user?.store_id) === Number(id);
@@ -114,6 +116,21 @@ export default function GeraiDetail() {
       loadAll();
     } catch (err) {
       alert(err?.response?.data?.message || "Gagal menghapus pegawai.");
+    }
+  }
+
+  async function handleDeleteStore() {
+    const ok = window.confirm(
+      `Hapus gerai "${store.name}" ini? Tindakan ini akan:\n• Menghapus semua pegawai di gerai ini\n• Menghapus semua pencatatan pengeluaran (barang keluar) gerai ini\n• Menghapus semua pencatatan pemasukan gerai ini\n• Membuat akun supervisor/kasir yang bertugas di gerai ini menjadi tidak terassign\n\nTindakan ini tidak bisa dibatalkan.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteStore(store.id);
+      navigate("/peta");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Gagal menghapus gerai.");
+      setDeleting(false);
     }
   }
 
@@ -183,12 +200,21 @@ export default function GeraiDetail() {
               <span className="material-symbols-outlined text-base">arrow_back</span> Kembali
             </button>
             {canManageStore && (
-              <button
-                onClick={() => setEditOpen(true)}
-                className="h-9 px-3.5 rounded-lg bg-idm-blue text-white hover:bg-idm-blue-dark transition-colors font-bold text-xs flex items-center gap-1.5 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-base">edit</span> Edit Gerai
-              </button>
+              <>
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="h-9 px-3.5 rounded-lg bg-idm-blue text-white hover:bg-idm-blue-dark transition-colors font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-base">edit</span> Edit Gerai
+                </button>
+                <button
+                  onClick={handleDeleteStore}
+                  disabled={deleting}
+                  className="h-9 px-3.5 rounded-lg bg-idm-red text-white hover:bg-idm-red-dark transition-colors font-bold text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                >
+                  <span className="material-symbols-outlined text-base">delete</span> Hapus Gerai
+                </button>
+              </>
             )}
           </>
         }
@@ -341,7 +367,7 @@ export default function GeraiDetail() {
                     attribution='&copy; OpenStreetMap contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <Marker position={[Number(store.latitude), Number(store.longitude)]} icon={coloredPin("#005baa")}>
+                  <Marker position={[Number(store.latitude), Number(store.longitude)]} icon={coloredPin("#145fa0")}>
                     <Popup>{store.name}</Popup>
                   </Marker>
                 </MapContainer>

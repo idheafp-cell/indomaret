@@ -7,12 +7,20 @@ import KpiCard from "../components/ui/KpiCard";
 import Modal from "../components/ui/Modal";
 import { Field, InputShell, inputClass } from "../components/ui/InputShell";
 import EmployeeInputToggle from "../components/ui/EmployeeInputToggle";
+import TableFilter, { DEFAULT_TABLE_FILTERS, filtersToParams, countActiveFilters } from "../components/ui/TableFilter";
 import { useAuth } from "../context/AuthContext";
-import { listIncomes, createIncome, listStores, listEmployees } from "../api/resources";
+import { listIncomes, createIncome, updateIncome, deleteIncome, listStores, listEmployees } from "../api/resources";
 import { exportRowsToExcel } from "../lib/exportExcel";
 import { formatRupiah, formatDate, todayISO } from "../lib/format";
 
 const STATUS_LABEL = { approved: "Disetujui", pending: "Menunggu", rejected: "Ditolak" };
+
+// Pilihan urutan mengikuti kolom tabel. Nilai `value` harus cocok dengan
+// whitelist `sort` di IncomeController@index.
+const SORT_GROUPS = [
+  { label: "Tanggal", icon: "calendar_today", options: [{ value: "date_desc", label: "Terbaru" }, { value: "date_asc", label: "Terlama" }] },
+  { label: "Jumlah (Omset)", icon: "payments", options: [{ value: "amount_desc", label: "Tertinggi" }, { value: "amount_asc", label: "Terendah" }] },
+];
 
 export default function Pemasukan() {
   const { isManager, user } = useAuth();
@@ -27,6 +35,8 @@ export default function Pemasukan() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [filters, setFilters] = useState(DEFAULT_TABLE_FILTERS);
   const [form, setForm] = useState(emptyForm());
 
   function emptyForm() {
@@ -43,7 +53,7 @@ export default function Pemasukan() {
 
   function loadList(p = 1, term = search) {
     setLoading(true);
-    listIncomes({ page: p, per_page: 8, search: term || undefined })
+    listIncomes({ page: p, per_page: 8, search: term || undefined, ...filtersToParams(filters) })
       .then((res) => {
         setRows(res.data || []);
         setMeta(res);
@@ -55,10 +65,15 @@ export default function Pemasukan() {
   useEffect(() => {
     const timer = setTimeout(() => loadList(page, search), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [page, search]);
+  }, [page, search, filters]);
 
   function handleSearch(value) {
     setSearch(value);
+    setPage(1);
+  }
+
+  function handleFilters(next) {
+    setFilters(next);
     setPage(1);
   }
 
@@ -73,26 +88,74 @@ export default function Pemasukan() {
   const totalTransaksiSemua = meta?.total ?? 0;
   const rataRataSemua = totalTransaksiSemua ? totalSemua / totalTransaksiSemua : 0;
 
+  function openCreateModal() {
+    setEditingRow(null);
+    setForm(emptyForm());
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  function openEditModal(row) {
+    setEditingRow(row);
+    setForm({
+      store_id: "",
+      date: (row.date || "").slice(0, 10) || todayISO(),
+      amount: String(row.amount ?? ""),
+      notes: row.notes || "",
+      mode: "self",
+      employee_name: "",
+      employee_password: "",
+    });
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  async function handleDelete(row) {
+    const ok = window.confirm(
+      "Hapus transaksi pemasukan ini? Tindakan tidak bisa dibatalkan."
+    );
+    if (!ok) return;
+    try {
+      await deleteIncome(row.id);
+      loadList(page);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Gagal menghapus transaksi.");
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError("");
     setSaving(true);
     try {
-      const payload = {
-        date: form.date,
-        amount: Number(form.amount),
-        notes: form.notes || undefined,
-      };
-      if (isManager) payload.store_id = Number(form.store_id);
-      if (form.mode === "employee") {
-        payload.employee_name = form.employee_name;
-        payload.employee_password = form.employee_password;
+      if (editingRow) {
+        const payload = {
+          date: form.date,
+          amount: Number(form.amount),
+          notes: form.notes || undefined,
+        };
+        await updateIncome(editingRow.id, payload);
+        setModalOpen(false);
+        setEditingRow(null);
+        setForm(emptyForm());
+        loadList(page);
+      } else {
+        const payload = {
+          date: form.date,
+          amount: Number(form.amount),
+          notes: form.notes || undefined,
+        };
+        if (isManager) payload.store_id = Number(form.store_id);
+        if (form.mode === "employee") {
+          payload.employee_name = form.employee_name;
+          payload.employee_password = form.employee_password;
+        }
+        await createIncome(payload);
+        setModalOpen(false);
+        setForm(emptyForm());
+        loadList(1);
+        setPage(1);
       }
-      await createIncome(payload);
-      setModalOpen(false);
-      setForm(emptyForm());
-      loadList(1);
-      setPage(1);
     } catch (err) {
       const errs = err?.response?.data?.errors;
       const msg = errs ? Object.values(errs)[0]?.[0] : err?.response?.data?.message;
@@ -105,7 +168,7 @@ export default function Pemasukan() {
   async function handleExportExcel() {
     setExporting(true);
     try {
-      const res = await listIncomes({ search: search || undefined, per_page: 10000 });
+      const res = await listIncomes({ search: search || undefined, per_page: 10000, ...filtersToParams(filters) });
       exportRowsToExcel(
         res.data || [],
         [
@@ -144,7 +207,7 @@ export default function Pemasukan() {
               {exporting ? "Menyiapkan..." : "Unduh Data"}
             </button>
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={openCreateModal}
               className="flex items-center gap-1.5 bg-idm-blue hover:bg-idm-blue-dark text-white px-4 py-2 rounded-xl font-bold text-body-sm shadow-sm transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">add_circle</span>Catat Pemasukan
@@ -185,7 +248,16 @@ export default function Pemasukan() {
           </span>
         }
         description="Riwayat realisasi kas harian seluruh gerai"
-        actions={<TableSearch value={search} onChange={handleSearch} placeholder="Cari gerai, penginput..." />}
+        actions={
+          <>
+            <TableSearch value={search} onChange={handleSearch} placeholder="Cari gerai, penginput..." />
+            <TableFilter
+              value={filters}
+              onChange={handleFilters}
+              sortGroups={SORT_GROUPS}
+            />
+          </>
+        }
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -195,6 +267,7 @@ export default function Pemasukan() {
                 <th className="py-2.5 px-3">Gerai</th>
                 <th className="py-2.5 px-3 text-right">Jumlah</th>
                 <th className="py-2.5 px-3">Diinput Oleh</th>
+                <th className="py-2.5 px-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle text-body-sm">
@@ -213,14 +286,38 @@ export default function Pemasukan() {
                     {formatRupiah(row.amount)}
                   </td>
                   <td className="py-3 px-3 text-[12px] text-text-muted">{row.employee?.name || row.user?.name}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openEditModal(row)}
+                        type="button"
+                        title="Edit transaksi"
+                        aria-label={`Edit transaksi ${formatDate(row.date)}`}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 border border-slate-200 text-text-muted hover:text-idm-blue hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(row)}
+                        type="button"
+                        title="Hapus transaksi"
+                        aria-label={`Hapus transaksi ${formatDate(row.date)}`}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 border border-slate-200 text-text-muted hover:text-idm-red hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-text-muted text-sm">
+                  <td colSpan={5} className="py-8 text-center text-text-muted text-sm">
                     {search
                       ? `Tidak ada transaksi yang cocok dengan "${search}".`
-                      : "Belum ada transaksi pemasukan."}
+                      : countActiveFilters(filters) > 0
+                        ? "Tidak ada transaksi yang cocok dengan filter. Coba ubah atau reset filter."
+                        : "Belum ada transaksi pemasukan."}
                   </td>
                 </tr>
               )}
@@ -242,8 +339,8 @@ export default function Pemasukan() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Catat Pemasukan Kasir"
-        description="Input data penerimaan kas harian gerai Indomaret"
+        title={editingRow ? "Edit Pemasukan" : "Catat Pemasukan Kasir"}
+        description={editingRow ? `Ubah transaksi ${formatDate(editingRow.date)}` : "Input data penerimaan kas harian gerai Indomaret"}
         footer={
           <>
             <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
@@ -264,33 +361,48 @@ export default function Pemasukan() {
                 className="px-4 py-2 rounded-xl bg-idm-blue hover:bg-idm-blue-dark text-white text-sm font-bold shadow-sm disabled:opacity-60 flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">save</span>
-                {saving ? "Menyimpan..." : "Simpan Pemasukan"}
+                {saving ? "Menyimpan..." : editingRow ? "Simpan Perubahan" : "Simpan Pemasukan"}
               </button>
             </div>
           </>
         }
       >
         <form id="form-pemasukan" onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {isManager && (
-              <Field label="Gerai Indomaret" code="store_id" required>
-                <InputShell icon="storefront">
-                  <select
-                    required
-                    className={inputClass}
-                    value={form.store_id}
-                    onChange={(e) => setForm((f) => ({ ...f, store_id: e.target.value }))}
-                  >
-                    <option value="">Pilih gerai...</option>
-                    {storeList.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.store_code} • {i.name}
-                      </option>
-                    ))}
-                  </select>
-                </InputShell>
+          {!editingRow && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {isManager && (
+                <Field label="Gerai Indomaret" code="store_id" required>
+                  <InputShell icon="storefront">
+                    <select
+                      required
+                      className={inputClass}
+                      value={form.store_id}
+                      onChange={(e) => setForm((f) => ({ ...f, store_id: e.target.value }))}
+                    >
+                      <option value="">Pilih gerai...</option>
+                      {storeList.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.store_code} • {i.name}
+                        </option>
+                      ))}
+                    </select>
+                  </InputShell>
+                </Field>
+              )}
+              <Field label="Tanggal Transaksi" code="date" required>
+              <InputShell icon="calendar_today">
+                <input
+                  type="date"
+                  required
+                  className={inputClass}
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                />
+              </InputShell>
               </Field>
-            )}
+            </div>
+          )}
+          {editingRow && (
             <Field label="Tanggal Transaksi" code="date" required>
               <InputShell icon="calendar_today">
                 <input
@@ -302,7 +414,7 @@ export default function Pemasukan() {
                 />
               </InputShell>
             </Field>
-          </div>
+          )}
 
           <Field label="Nominal Pemasukan" code="amount" required>
             <InputShell icon="payments">
@@ -330,15 +442,17 @@ export default function Pemasukan() {
             </InputShell>
           </Field>
 
-          <EmployeeInputToggle
-            mode={form.mode}
-            onModeChange={(mode) => setForm((f) => ({ ...f, mode }))}
-            name={form.employee_name}
-            onNameChange={(v) => setForm((f) => ({ ...f, employee_name: v }))}
-            password={form.employee_password}
-            onPasswordChange={(v) => setForm((f) => ({ ...f, employee_password: v }))}
-            employeeOptions={employeeList}
-          />
+          {!editingRow && (
+            <EmployeeInputToggle
+              mode={form.mode}
+              onModeChange={(mode) => setForm((f) => ({ ...f, mode }))}
+              name={form.employee_name}
+              onNameChange={(v) => setForm((f) => ({ ...f, employee_name: v }))}
+              password={form.employee_password}
+              onPasswordChange={(v) => setForm((f) => ({ ...f, employee_password: v }))}
+              employeeOptions={employeeList}
+            />
+          )}
 
           {formError && (
             <div className="flex items-center gap-2 text-idm-red bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs font-semibold">

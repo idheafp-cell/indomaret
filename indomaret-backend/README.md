@@ -1,63 +1,48 @@
 # Dashboard Indomaret - Backend (Laravel API)
 
 Backend REST API untuk memonitor pengeluaran barang (per kategori) dan
-pemasukan harian seluruh titik Indomaret dalam satu kabupaten, lengkap
-dengan endpoint dashboard, peta sebaran, manajemen user, dan generate
+pemasukan harian seluruh titik Indomaret dalam satu kabupaten/kota, lengkap
+dengan endpoint dashboard, peta sebaran, manajemen akun, dan generate
 laporan PDF.
 
-## ⚠️ Catatan penting soal file `vendor/`
-
-Project ini dibuat di lingkungan sandbox cloud yang **tidak memiliki akses
-ke Packagist/getcomposer.org** (diblokir oleh kebijakan jaringan), sehingga
-folder `vendor/` (dependency Composer) **tidak bisa di-generate & disertakan**
-di sini. Semua kode aplikasi (migrations, models, controllers, routes,
-seeders, view PDF) sudah lengkap dan sudah dicek sintaksnya (`php -l`),
-tapi belum bisa dijalankan/diuji langsung (`php artisan migrate`, dsb) di
-lingkungan ini.
-
-**Yang perlu Anda lakukan di komputer Anda sendiri** (yang sepertinya sudah
-punya PHP/Composer/Laravel Herd terpasang):
-
-```bash
-cd indomaret-backend
-composer install
-cp .env.example .env
-php artisan key:generate
-```
-
-Lanjutkan ke bagian **Instalasi** di bawah untuk setup database & migrasi.
+> **Catatan skema**: nama tabel, kolom, model, controller, dan endpoint API
+> di seluruh backend ini memakai Bahasa Inggris (lihat bagian "Daftar
+> Endpoint" & "Struktur Data" di bawah). Pesan error/validasi dan dokumen
+> di dalam kode tetap Bahasa Indonesia — yang diganti murni penamaan
+> teknis/skema, supaya database aman dibagikan tanpa perlu diterjemahkan
+> dulu.
 
 ## Fitur
 
 - **Autentikasi 3 role** (Laravel Sanctum, token-based): `manager`,
-  `supervisor`, `kasir`. (Role `admin` sudah DIHAPUS — semua kewenangannya
-  dipegang `manager`.)
-- **Input Indomaret satu kabupaten**: manager mengelola master data
-  kabupaten & titik-titik Indomaret (nama, alamat, koordinat).
-- **Input barang keluar per kategori** (bukan per produk spesifik) dan
-  **input pemasukan harian**.
-- **Akun kasir bersama + identitas individu**: satu akun login `kasir`
-  dipakai bersama oleh semua kasir fisik di satu toko (supaya mereka bisa
-  masuk ke Kasir Dashboard). Tiap submit transaksi tetap WAJIB mengisi
-  `employee_nama` + `employee_password` (identitas individu dari tabel
-  `employees`, dikelola oleh supervisor), yang diverifikasi di server dan
-  dicatat sebagai `employee_id` untuk audit ("siapa yang benar-benar input").
+  `supervisor`, `cashier`.
+- **Master data gerai satu kabupaten/kota**: manager mengelola master data
+  kabupaten (`regencies`) & titik-titik Indomaret (`stores`: nama, alamat,
+  kecamatan, koordinat, foto).
+- **Input barang keluar per kategori** (`expenses`, bukan per produk
+  spesifik) dan **input pemasukan harian** (`incomes`).
+- **Akun kasir bersama + identitas individu**: satu akun login role
+  `cashier` dipakai bersama oleh semua kasir fisik di satu toko. Tiap
+  submit transaksi tetap WAJIB mengisi `employee_name` + `employee_password`
+  (identitas individu dari tabel `employees`, dikelola manager/supervisor),
+  diverifikasi di server dan dicatat sebagai `employee_id` untuk audit.
 - **Alur persetujuan (approval)**: transaksi yang disubmit lewat akun
-  `kasir` berstatus `pending` sampai disetujui (`approve`) atau ditolak
+  `cashier` berstatus `pending` sampai disetujui (`approve`) atau ditolak
   (`reject`) oleh supervisor toko itu (atau manager, untuk gerai mana pun).
   Transaksi `pending`/`rejected` **tidak dihitung** ke dashboard/laporan —
   baru masuk hitungan setelah `approved`. Transaksi yang disubmit langsung
   oleh manager/supervisor otomatis `approved`.
 - **Notifikasi in-app** (di-poll berkala oleh frontend, bukan websocket):
-  supervisor & manager dapat notif saat kasir submit transaksi baru;
-  akun kasir dapat notif saat transaksinya disetujui/ditolak.
-- **Dashboard (khusus manager)**: ringkasan total pengeluaran, pemasukan, estimasi laba,
-  breakdown pengeluaran per kategori, tren harian, jumlah transaksi
-  menunggu persetujuan (untuk grafik & badge).
-- **Peta sebaran Indomaret**: endpoint `GET /api/peta-sebaran` mengembalikan
-  daftar titik + koordinat (latitude/longitude) + agregat bulan berjalan,
-  siap dipakai dengan library peta gratis seperti **Leaflet + OpenStreetMap**
-  di sisi frontend.
+  supervisor & manager dapat notif saat cashier submit transaksi baru;
+  akun cashier dapat notif saat transaksinya disetujui/ditolak.
+- **Dashboard (khusus manager)**: ringkasan total pengeluaran, pemasukan,
+  estimasi laba, breakdown pengeluaran per kategori, tren harian, jumlah
+  transaksi menunggu persetujuan.
+- **Peta sebaran gerai**: `GET /api/stores/map` mengembalikan daftar titik +
+  koordinat + agregat bulan berjalan + tren 14 hari, siap dipakai dengan
+  Leaflet + OpenStreetMap di frontend. Detail per gerai (KPI harian,
+  distribusi kategori, tren 7 hari) ada di endpoint terpisah
+  `GET /api/stores/{id}/map-summary`, dipanggil saat marker diklik.
 - **Generate laporan PDF** memakai `barryvdh/laravel-dompdf` (hanya
   menghitung transaksi berstatus `approved`).
 
@@ -65,26 +50,26 @@ Lanjutkan ke bagian **Instalasi** di bawah untuk setup database & migrasi.
 
 | Peran | Login? | Scope | Bisa apa saja |
 |---|---|---|---|
-| **Manager** | Ya | Semua titik se-kabupaten | **Akun pusat, akses penuh.** Satu-satunya yang bisa kelola akun (manager/supervisor/kasir) & master data (kabupaten/gerai/kategori barang); lihat dashboard/peta/laporan semua titik; approve/reject transaksi kasir di gerai mana pun |
-| **Supervisor** | Ya | 1 titik Indomaret | **Penanggung jawab utama persetujuan transaksi kasir toko itu.** Kelola karyawan/kasir individu di titiknya; input & lihat pengeluaran/pemasukan titiknya; laporan titiknya. Boleh melihat **peta sebaran seluruh gerai** (lokasi saja — angka omset/tren gerai lain disembunyikan). **TIDAK punya akses dashboard ringkasan** (khusus manager) |
-| **Kasir** | Ya (SATU akun dipakai bersama per toko) | 1 titik Indomaret | HANYA bisa input pemasukan/barang keluar + lihat riwayat & notifikasi miliknya sendiri (tidak dapat akses dashboard/peta/laporan). Tiap submit WAJIB isi nama+password individu (tabel `employees`); transaksinya berstatus `pending` sampai disetujui |
+| **manager** | Ya | Semua titik se-kabupaten/kota | **Akun pusat, akses penuh.** Satu-satunya yang bisa kelola akun (`users`: manager/supervisor/cashier) & master data (`regencies`/`stores`/`item_categories`); lihat dashboard/peta/laporan semua titik; approve/reject transaksi kasir di gerai mana pun |
+| **supervisor** | Ya | 1 titik Indomaret (`store_id`) | **Penanggung jawab utama persetujuan transaksi kasir toko itu.** Kelola karyawan (`employees`) di titiknya; input & lihat pengeluaran/pemasukan titiknya; laporan titiknya. Boleh melihat **peta sebaran seluruh gerai** (lokasi saja — angka omset/tren gerai lain disembunyikan). **TIDAK punya akses dashboard ringkasan** (khusus manager) |
+| **cashier** | Ya (SATU akun dipakai bersama per toko) | 1 titik Indomaret (`store_id`) | HANYA bisa input pemasukan/barang keluar + lihat riwayat & notifikasi miliknya sendiri (tidak dapat akses dashboard/peta/laporan). Tiap submit WAJIB isi nama+password individu (tabel `employees`); transaksinya berstatus `pending` sampai disetujui |
 
 ## Struktur Data (ERD ringkas)
 
 ```
-kabupatens ──< indomarets ──< users (role=supervisor ATAU kasir, 1:1 per indomaret per role)
-                    │      └─< employees (identitas individu kasir, nama+password, dibuat oleh supervisor)
-                    │
-                    ├──< pengeluarans >── kategori_barangs (master kategori)
-                    └──< pemasukans
+regencies ──< stores ──< users (role=supervisor ATAU cashier, 1:1 per store per role)
+                  │   └─< employees (identitas individu kasir, name+password)
+                  │
+                  ├──< expenses >── item_categories (master kategori)
+                  └──< incomes
 
-users role=manager TIDAK terikat ke indomaret_id (lihat semua titik).
+users role=manager TIDAK terikat ke store_id (lihat semua titik).
 
-pengeluarans & pemasukans masing-masing punya:
-  user_id           -> akun yang submit (manager/supervisor/kasir)
+expenses & incomes masing-masing punya:
+  user_id           -> akun yang submit (manager/supervisor/cashier)
   employee_id       -> (nullable) identitas individu kasir yang benar-benar input
   status            -> pending | approved | rejected (default approved,
-                        jadi pending hanya kalau user_id adalah akun kasir)
+                        jadi pending hanya kalau user_id adalah akun cashier)
   approved_by       -> user yang approve/reject
   approved_at       -> kapan diputuskan
   rejection_reason  -> alasan (wajib diisi kalau reject)
@@ -127,24 +112,28 @@ DB_CONNECTION=sqlite
 touch database/database.sqlite
 ```
 
-### 4. Migrasi + Seeder (data contoh)
+### 4. Migrasi + data
+
 ```bash
-php artisan migrate --seed
+php artisan migrate
 ```
-Seeder akan membuat:
-- 1 kabupaten contoh (Kabupaten Sidoarjo) + 4 titik Indomaret dengan koordinat
-- 7 kategori barang (Makanan Ringan, Minuman, Rokok, dll)
-- 1 akun manager (akun pusat, akses penuh):
-  `manager@indomaret-dashboard.test` / `password123`
-- 4 akun supervisor (satu per titik): `supervisor1@indomaret-dashboard.test`
-  s/d `supervisor4@...`, password `password123`
-- 4 akun kasir/login (satu per titik): `kasir1@indomaret-dashboard.test`
-  s/d `kasir4@...`, password `password123`
-- 2 karyawan/kasir individu contoh per titik (nama: "Kasir Satu", "Kasir Dua",
-  password `kasir123`) — diisi saat login akun kasir toko itu untuk submit transaksi
-- Data transaksi pengeluaran & pemasukan 14 hari terakhir berstatus `approved`
-  (untuk isi dashboard), + beberapa contoh transaksi `pending` dari akun kasir
-  di 2 titik pertama beserta notifikasinya (untuk coba alur persetujuan)
+
+Ada dua sumber data contoh, pilih salah satu:
+
+- **`php artisan db:seed`** (`DatabaseSeeder`, cepat untuk dev/testing) — bikin
+  1 kabupaten contoh (Sidoarjo) + 4 gerai, 7 kategori barang, 1 akun manager,
+  1 supervisor & 1 cashier per gerai, 2 karyawan contoh per gerai, beberapa
+  transaksi `approved` + beberapa `pending` untuk coba alur persetujuan.
+  Kredensial: `manager@indomaret-dashboard.test` / `password123`,
+  `supervisorN@...` / `password123`, `cashierN@...` / `password123` (ganti
+  N dengan nomor gerai), karyawan `Kasir Satu`/`Kasir Dua` / `kasir123`.
+- **`indomaret_surabaya_from_raw.sql`** (data asli, 259 gerai Surabaya hasil
+  scraping) — jalankan lewat pgAdmin/psql kalau mau data yang lebih
+  realistis. Pola kredensialnya sama (`manager@...`, `supervisorN@...`,
+  `cashierN@...`, semua `password123`), N dari 1 s/d 259.
+
+Jangan jalankan keduanya sekaligus di database yang sama — script SQL
+Surabaya memulai dengan `TRUNCATE` seluruh tabel aplikasi.
 
 ### 5. Jalankan server
 ```bash
@@ -155,7 +144,8 @@ API bisa diakses di `http://localhost:8000/api`.
 ### 6. Testing API
 Import `postman_collection.json` (ada di root project ini) ke Postman —
 sudah berisi contoh semua endpoint termasuk login, input transaksi via
-kasir, dashboard, peta sebaran, dan download laporan PDF.
+cashier, dashboard, peta sebaran, dan download laporan PDF, dengan nama
+field & endpoint versi terbaru (Bahasa Inggris).
 
 ## Daftar Endpoint
 
@@ -169,10 +159,10 @@ Authorization: Bearer {token}
 |---|---|---|
 | POST | `/api/login` | Login (semua role) → dapat token |
 | POST | `/api/logout` | Hapus token aktif |
-| GET  | `/api/me` | Profil user yang sedang login (termasuk relasi `indomaret`) |
-| PUT  | `/api/me/password` | Ganti password sendiri |
+| GET  | `/api/me` | Profil user yang sedang login (termasuk relasi `store`) |
+| PUT  | `/api/me/password` | Ganti password sendiri (`current_password`, `new_password`, `new_password_confirmation`) |
 
-### Notifikasi (semua role, termasuk kasir)
+### Notifikasi (semua role, termasuk cashier)
 | Method | Endpoint | Keterangan |
 |---|---|---|
 | GET | `/api/notifications?unread_only=1&per_page=` | List notifikasi milik sendiri + `unread_count` |
@@ -182,88 +172,106 @@ Authorization: Bearer {token}
 ### Dashboard & Peta
 | Method | Endpoint | Role | Keterangan |
 |---|---|---|---|
-| GET | `/api/dashboard?start_date=&end_date=&indomaret_id=` | **manager saja** | Ringkasan se-kabupaten, termasuk `menunggu_persetujuan` |
-| GET | `/api/peta-sebaran` | manager, supervisor | Semua titik + koordinat + agregat bulan berjalan. Supervisor tetap menerima SEMUA titik (supaya peta sebarannya utuh), tapi gerai selain miliknya dikirim dengan `tampilkan_angka: false` dan angka `null` |
+| GET | `/api/dashboard?start_date=&end_date=&store_id=` | **manager saja** | Ringkasan se-kabupaten/kota, termasuk `pending_approval` |
+| GET | `/api/stores/map` | manager, supervisor | Semua titik + koordinat + agregat bulan berjalan + `daily_trend` 14 hari. Supervisor tetap menerima SEMUA titik (supaya peta sebarannya utuh), tapi gerai selain miliknya dikirim dengan `show_amounts: false` dan angka `null` |
+| GET | `/api/stores/{id}/map-summary` | manager, supervisor (gerai sendiri) | Isi pop-up detail gerai di peta: KPI transaksi harian, unit barang keluar, margin, `distribution` (unit per kategori), `top_sales` (nilai per kategori + porsinya), `daily_trend` 7 hari |
 
 ### Master Data
 | Method | Endpoint | Role | Keterangan |
 |---|---|---|---|
-| GET/POST/PUT/DELETE | `/api/kabupaten` | manager | CRUD kabupaten |
-| GET | `/api/indomaret` | manager, supervisor | List titik (data lokasi/kontak saja, semua role lihat semua gerai). Tiap baris punya `boleh_lihat_detail` — false berarti supervisor tidak boleh membuka detail gerai itu |
-| GET | `/api/indomaret/{id}/ringkasan-peta` | manager, supervisor (gerai sendiri) | Isi pop-up gerai di peta: KPI transaksi harian + unit barang keluar + margin, `distribusi` (unit per kategori), `top_penjualan` (nilai per kategori + porsinya), dan `tren_harian` 7 hari. Dipanggil hanya saat marker diklik |
-| POST/PUT/DELETE | `/api/indomaret/{id}` | manager | Kelola titik Indomaret |
-| GET | `/api/kategori-barang` | semua (termasuk kasir) | List kategori barang |
-| POST/PUT/DELETE | `/api/kategori-barang/{id}` | manager | Kelola kategori barang |
-| GET/POST/PUT/DELETE | `/api/users` | manager | Kelola akun manager/supervisor/kasir |
+| GET/POST/PUT/DELETE | `/api/regencies` | manager | CRUD kabupaten/kota |
+| GET | `/api/stores` | manager, supervisor | List gerai (data lokasi/kontak, semua role lihat semua gerai). Tiap baris punya `can_view_detail` — false berarti supervisor tidak boleh membuka detail gerai itu |
+| GET | `/api/stores/{id}` | manager, supervisor (gerai sendiri) | Detail satu gerai |
+| POST/PUT/DELETE | `/api/stores/{id}` | manager | Kelola gerai (`regency_id`, `store_code`, `name`, `address`, `district`, `latitude`, `longitude`, `phone`, `photo_url`, `is_active`) |
+| GET | `/api/item-categories?active_only=` | semua (termasuk cashier) | List kategori barang |
+| POST/PUT/DELETE | `/api/item-categories/{id}` | manager | Kelola kategori barang |
+| GET/POST/PUT/DELETE | `/api/users` | manager | Kelola akun manager/supervisor/cashier |
 
 ### Karyawan / Kasir individu (tabel `employees`)
 | Method | Endpoint | Role | Keterangan |
 |---|---|---|---|
-| GET | `/api/employees` | semua (termasuk kasir) | List karyawan individu (supervisor/kasir hanya miliknya) |
-| POST | `/api/employees` | manager, supervisor | Tambah karyawan baru (nama + password; manager wajib kirim `indomaret_id`) |
-| PUT/DELETE | `/api/employees/{id}` | manager, supervisor | Update/nonaktifkan karyawan |
+| GET | `/api/employees` | semua (termasuk cashier) | List karyawan individu (supervisor/cashier hanya miliknya) |
+| POST | `/api/employees` | manager, supervisor | Tambah karyawan baru (`name` + `password`; manager wajib kirim `store_id`) |
+| PUT/DELETE | `/api/employees/{id}` | manager, supervisor | Update/nonaktifkan/hapus karyawan |
 
 ### Transaksi
+
+**Expenses (Barang Keluar)**
 | Method | Endpoint | Role | Keterangan |
 |---|---|---|---|
-| GET | `/api/pengeluaran?start_date=&end_date=&kategori_barang_id=&status=&search=` | semua | List pengeluaran (filter `status=pending` untuk antrean persetujuan). `search` mencocokkan nama/kode gerai, nama kategori, nama penginput, dan keterangan — dikerjakan di server supaya mencakup seluruh data, bukan cuma halaman yang terbuka. Endpoint `/api/pemasukan` punya `search` yang sama (mencocokkan gerai, penginput, keterangan) |
-| POST | `/api/pengeluaran` | semua | Input barang keluar (lihat contoh body di bawah) |
-| GET | `/api/pengeluaran/{id}` | semua (discope) | Detail |
-| PUT/DELETE | `/api/pengeluaran/{id}` | manager, supervisor | Update/hapus (kasir tidak bisa) |
-| POST | `/api/pengeluaran/{id}/approve` | manager, supervisor | Setujui transaksi pending |
-| POST | `/api/pengeluaran/{id}/reject` | manager, supervisor | Tolak transaksi pending (body: `rejection_reason` wajib) |
-| GET/POST/PUT/DELETE/approve/reject | `/api/pemasukan...` | sama seperti di atas | Pola identik, field utama `jumlah` (tidak ada field `sumber` lagi — sudah dihapus) |
+| GET | `/api/expenses?start_date=&end_date=&item_category_id=&status=&search=&store_id=&per_page=` | semua | List (filter `status=pending` untuk antrean persetujuan). `search` mencocokkan nama/kode gerai, nama kategori, nama penginput, dan `notes`. Response ikut sertakan `summary.total_value` & `summary.total_units` dari SELURUH data yang cocok filter |
+| POST | `/api/expenses` | semua | Input barang keluar |
+| GET | `/api/expenses/{id}` | semua (discope) | Detail |
+| PUT/DELETE | `/api/expenses/{id}` | manager, supervisor | Update/hapus (cashier tidak bisa) |
+| POST | `/api/expenses/{id}/approve` | manager, supervisor | Setujui transaksi pending |
+| POST | `/api/expenses/{id}/reject` | manager, supervisor | Tolak transaksi pending (body: `rejection_reason` wajib) |
 
-Contoh body **POST `/api/pengeluaran`** (input oleh manager/supervisor sendiri → langsung `approved`):
+**Incomes (Pemasukan)** — pola & aturan role identik dengan Expenses, field
+utamanya `amount` (tidak ada field `unit`/`item_category_id`, dan tidak ada
+lagi field `sumber` — sudah dihapus dari sistem):
+`GET/POST /api/incomes`, `GET/PUT/DELETE /api/incomes/{id}`,
+`POST /api/incomes/{id}/approve`, `POST /api/incomes/{id}/reject`.
+
+Contoh body **POST `/api/expenses`** (input oleh manager/supervisor sendiri
+→ langsung `approved`; manager wajib menambahkan `store_id`):
 ```json
 {
-  "kategori_barang_id": 1,
-  "tanggal": "2026-09-15",
-  "jumlah_barang": 20,
-  "satuan": "pcs",
-  "nilai": 250000,
-  "keterangan": "Stok opname harian"
+  "item_category_id": 1,
+  "date": "2026-09-15",
+  "quantity": 20,
+  "unit": "pcs",
+  "value": 250000,
+  "notes": "Stok opname harian"
 }
 ```
 
-Contoh body **kalau login sebagai akun kasir** (wajib isi nama+password
-individu kasir yang benar-benar input; hasilnya berstatus `pending`):
+Contoh body **kalau login sebagai akun cashier** (wajib isi nama+password
+individu karyawan yang benar-benar input; hasilnya berstatus `pending`):
 ```json
 {
-  "kategori_barang_id": 1,
-  "tanggal": "2026-09-15",
-  "jumlah_barang": 10,
-  "nilai": 120000,
-  "employee_nama": "Kasir Satu",
+  "item_category_id": 1,
+  "date": "2026-09-15",
+  "quantity": 10,
+  "value": 120000,
+  "employee_name": "Kasir Satu",
   "employee_password": "kasir123"
 }
 ```
-Body untuk `/api/pemasukan` sama polanya, field utamanya `jumlah` (dulu ada
-field `sumber` — tunai/non_tunai/lainnya — tapi sudah dihapus dari sistem).
 
-Contoh body **POST `/api/pengeluaran/{id}/reject`**:
+Body untuk `/api/incomes` sama polanya, field utamanya `amount`:
+```json
+{
+  "date": "2026-09-15",
+  "amount": 3500000,
+  "employee_name": "Kasir Satu",
+  "employee_password": "kasir123"
+}
+```
+
+Contoh body **POST `/api/expenses/{id}/reject`** (sama untuk `/api/incomes/{id}/reject`):
 ```json
 { "rejection_reason": "Nilai tidak sesuai nota, mohon input ulang." }
 ```
 
-> Catatan: `indomaret_id` otomatis diambil dari akun supervisor/kasir yang
-> login (discope ke toko sendiri). Manager wajib mengirim
-> `indomaret_id` secara eksplisit karena tidak terikat ke satu toko.
+> Catatan: `store_id` otomatis diambil dari akun supervisor/cashier yang
+> login (discope ke toko sendiri). Manager wajib mengirim `store_id`
+> secara eksplisit karena tidak terikat ke satu toko.
 
-### Laporan PDF (manager, supervisor — TIDAK untuk kasir)
+### Laporan PDF (manager, supervisor — TIDAK untuk cashier)
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| GET | `/api/laporan/pengeluaran-pemasukan/pdf?indomaret_id=&start_date=&end_date=` | Download PDF laporan (supervisor otomatis ke titiknya sendiri; hanya menghitung transaksi `approved`) |
+| GET | `/api/reports/expenses-incomes/pdf?store_id=&start_date=&end_date=` | Download PDF laporan (supervisor otomatis ke titiknya sendiri; hanya menghitung transaksi `approved`) |
 
 ## Rekomendasi untuk Frontend
 
 - **Peta sebaran**: gunakan [Leaflet](https://leafletjs.com/) + tile
-  OpenStreetMap (gratis, tanpa API key) dengan data dari `/api/peta-sebaran`.
-- **Dashboard**: pakai chart library apapun (Chart.js, ApexCharts, dll) —
-  data `pengeluaran_per_kategori`, `tren_harian_pengeluaran`, dan
-  `tren_harian_pemasukan` dari `/api/dashboard` sudah dalam format siap pakai.
-- Backend ini murni API (JSON), jadi frontend (React/Vue/dll, atau hasil
-  desain dari Stitch) bisa dikembangkan terpisah dan konsumsi endpoint di atas.
+  OpenStreetMap (gratis, tanpa API key) dengan data dari `/api/stores/map`.
+- **Dashboard**: pakai chart library apapun (Chart.js, ApexCharts, dll, atau
+  SVG buatan sendiri seperti di frontend ini) — data `expense_by_category`,
+  `daily_expense_trend`, dan `daily_income_trend` dari `/api/dashboard`
+  sudah dalam format siap pakai.
+- Backend ini murni API (JSON), jadi frontend bisa dikembangkan terpisah dan
+  konsumsi endpoint di atas.
 
 ## Struktur Folder Penting
 
@@ -272,12 +280,12 @@ app/Http/Controllers/Api/   -> semua controller API
 app/Http/Middleware/EnsureUserHasRole.php  -> middleware pembatas role
 app/Services/EmployeeCredentialService.php -> verifikasi nama+password individu kasir
 app/Services/NotificationService.php       -> helper buat notifikasi in-app
-app/Models/                 -> Kabupaten, Indomaret, User, Employee, KategoriBarang, Pengeluaran, Pemasukan, Notification
-database/migrations/        -> struktur tabel (termasuk migration role manager/kasir & status approval)
-database/seeders/           -> data contoh (manager/supervisor/kasir + demo transaksi pending)
-resources/views/laporan/    -> template Blade untuk PDF
+app/Models/                 -> Regency, Store, User, Employee, ItemCategory, Expense, Income, Notification
+database/migrations/        -> struktur tabel (skema Inggris)
+database/seeders/           -> data contoh (manager/supervisor/cashier + demo transaksi pending)
+resources/views/reports/    -> template Blade untuk PDF
 routes/api.php               -> semua route API
-postman_collection.json     -> koleksi Postman siap import (BELUM diperbarui untuk role manager/kasir/approval — perlu update manual atau minta dibuatkan ulang)
+postman_collection.json     -> koleksi Postman siap import, sudah sinkron dengan endpoint & field terbaru
 ```
 
 ## Troubleshooting
@@ -289,3 +297,5 @@ postman_collection.json     -> koleksi Postman siap import (BELUM diperbarui unt
   aktif (biasanya sudah default di Laravel Herd/XAMPP).
 - **401 Unauthenticated**: pastikan header `Authorization: Bearer {token}`
   terkirim, token didapat dari response `/api/login`.
+- **422 saat login padahal password benar**: cek dulu email-nya — akun
+  hasil seeder/SQL Surabaya semua pakai domain `@indomaret-dashboard.test`.

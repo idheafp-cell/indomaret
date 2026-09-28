@@ -2,7 +2,7 @@ import L from "leaflet";
 
 // Ikon marker kustom warna Indomaret (biru) tanpa bergantung pada asset
 // default Leaflet (yang sering rusak ketika dibundel Vite).
-export function coloredPin(color = "#005baa") {
+export function coloredPin(color = "#145fa0") {
   const svg = `
     <svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
       <path d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 27 15 27s15-16.5 15-27c0-8.3-6.7-15-15-15z" fill="${color}"/>
@@ -17,9 +17,9 @@ export function coloredPin(color = "#005baa") {
   });
 }
 
-export const idmBluePin = coloredPin("#005baa");
-export const idmRedPin = coloredPin("#d61c24");
-export const idmYellowPin = coloredPin("#fdb813");
+export const idmBluePin = coloredPin("#145fa0");
+export const idmRedPin = coloredPin("#bf3339");
+export const idmYellowPin = coloredPin("#e1a81f");
 
 // Ikon "dot" gerai -- dipakai SERAGAM di ketiga tab peta `/peta` (Semua
 // Gerai, Wilayah Kecamatan, Heatmap Omset) supaya gaya markernya konsisten
@@ -31,7 +31,7 @@ export const idmYellowPin = coloredPin("#fdb813");
 // lewat `<Marker icon={storeDot(warna)}>`, BUKAN `coloredPin` (teardrop) --
 // teardrop dipertahankan cuma buat `coloredPin` sendiri (dipakai di halaman
 // detail gerai, bukan di `/peta`).
-export function storeDot(color = "#005baa", size = 18) {
+export function storeDot(color = "#145fa0", size = 18) {
   return L.divIcon({
     html: `
       <div style="
@@ -65,7 +65,7 @@ export function clusterIcon(count) {
     html: `
       <div style="
         width:${size}px;height:${size}px;border-radius:9999px;
-        background:#005baa;color:#fff;font-weight:800;font-size:${fontSize}px;
+        background:#145fa0;color:#fff;font-weight:800;font-size:${fontSize}px;
         display:flex;align-items:center;justify-content:center;
         line-height:1;font-family:'Plus Jakarta Sans',system-ui,sans-serif;
         border:2.5px solid #fff;

@@ -7,10 +7,13 @@ import KpiCard from "../components/ui/KpiCard";
 import Modal from "../components/ui/Modal";
 import { Field, InputShell, inputClass } from "../components/ui/InputShell";
 import EmployeeInputToggle from "../components/ui/EmployeeInputToggle";
+import TableFilter, { DEFAULT_TABLE_FILTERS, filtersToParams, countActiveFilters } from "../components/ui/TableFilter";
 import { useAuth } from "../context/AuthContext";
 import {
   listExpenses,
   createExpense,
+  updateExpense,
+  deleteExpense,
   listItemCategories,
   listStores,
   listEmployees,
@@ -19,6 +22,14 @@ import { exportRowsToExcel } from "../lib/exportExcel";
 import { formatRupiah, formatNumber, formatDate, todayISO } from "../lib/format";
 
 const STATUS_LABEL = { approved: "Disetujui", pending: "Menunggu", rejected: "Ditolak" };
+
+// Pilihan urutan mengikuti kolom tabel. Nilai `value` harus cocok dengan
+// whitelist `sort` di ExpenseController@index.
+const SORT_GROUPS = [
+  { label: "Tanggal", icon: "calendar_today", options: [{ value: "date_desc", label: "Terbaru" }, { value: "date_asc", label: "Terlama" }] },
+  { label: "Total Beban", icon: "payments", options: [{ value: "value_desc", label: "Tertinggi" }, { value: "value_asc", label: "Terendah" }] },
+  { label: "Qty", icon: "scale", options: [{ value: "quantity_desc", label: "Terbanyak" }, { value: "quantity_asc", label: "Tersedikit" }] },
+];
 
 export default function BarangKeluar() {
   const { isManager } = useAuth();
@@ -34,6 +45,8 @@ export default function BarangKeluar() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [filters, setFilters] = useState(DEFAULT_TABLE_FILTERS);
 
   const [form, setForm] = useState(emptyForm());
 
@@ -54,7 +67,7 @@ export default function BarangKeluar() {
 
   function loadList(p = 1, term = search) {
     setLoading(true);
-    listExpenses({ page: p, per_page: 8, search: term || undefined })
+    listExpenses({ page: p, per_page: 8, search: term || undefined, ...filtersToParams(filters) })
       .then((res) => {
         setRows(res.data || []);
         setMeta(res);
@@ -66,10 +79,15 @@ export default function BarangKeluar() {
   useEffect(() => {
     const timer = setTimeout(() => loadList(page, search), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [page, search]);
+  }, [page, search, filters]);
 
   function handleSearch(value) {
     setSearch(value);
+    setPage(1);
+  }
+
+  function handleFilters(next) {
+    setFilters(next);
     setPage(1);
   }
 
@@ -87,7 +105,7 @@ export default function BarangKeluar() {
   async function handleExportExcel() {
     setExporting(true);
     try {
-      const res = await listExpenses({ search: search || undefined, per_page: 10000 });
+      const res = await listExpenses({ search: search || undefined, per_page: 10000, ...filtersToParams(filters) });
       exportRowsToExcel(
         res.data || [],
         [
@@ -111,29 +129,83 @@ export default function BarangKeluar() {
     }
   }
 
+  function openCreateModal() {
+    setEditingRow(null);
+    setForm(emptyForm());
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  function openEditModal(row) {
+    setEditingRow(row);
+    setForm({
+      store_id: "",
+      item_category_id: String(row.item_category?.id ?? row.item_category_id ?? ""),
+      date: (row.date || "").slice(0, 10) || todayISO(),
+      quantity: String(row.quantity ?? ""),
+      unit: row.unit || "pcs",
+      value: String(row.value ?? ""),
+      notes: row.notes || "",
+      mode: "self",
+      employee_name: "",
+      employee_password: "",
+    });
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  async function handleDelete(row) {
+    const ok = window.confirm(
+      "Hapus transaksi barang keluar ini? Tindakan tidak bisa dibatalkan."
+    );
+    if (!ok) return;
+    try {
+      await deleteExpense(row.id);
+      loadList(page);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Gagal menghapus transaksi.");
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError("");
     setSaving(true);
     try {
-      const payload = {
-        item_category_id: Number(form.item_category_id),
-        date: form.date,
-        quantity: Number(form.quantity),
-        unit: form.unit || "pcs",
-        value: Number(form.value),
-        notes: form.notes || undefined,
-      };
-      if (isManager) payload.store_id = Number(form.store_id);
-      if (form.mode === "employee") {
-        payload.employee_name = form.employee_name;
-        payload.employee_password = form.employee_password;
+      if (editingRow) {
+        const payload = {
+          item_category_id: Number(form.item_category_id),
+          date: form.date,
+          quantity: Number(form.quantity),
+          unit: form.unit || "pcs",
+          value: Number(form.value),
+          notes: form.notes || undefined,
+        };
+        await updateExpense(editingRow.id, payload);
+        setModalOpen(false);
+        setEditingRow(null);
+        setForm(emptyForm());
+        loadList(page);
+      } else {
+        const payload = {
+          item_category_id: Number(form.item_category_id),
+          date: form.date,
+          quantity: Number(form.quantity),
+          unit: form.unit || "pcs",
+          value: Number(form.value),
+          notes: form.notes || undefined,
+        };
+        if (isManager) payload.store_id = Number(form.store_id);
+        if (form.mode === "employee") {
+          payload.employee_name = form.employee_name;
+          payload.employee_password = form.employee_password;
+        }
+        await createExpense(payload);
+        setModalOpen(false);
+        setForm(emptyForm());
+        loadList(1);
+        setPage(1);
       }
-      await createExpense(payload);
-      setModalOpen(false);
-      setForm(emptyForm());
-      loadList(1);
-      setPage(1);
     } catch (err) {
       const errs = err?.response?.data?.errors;
       const msg = errs ? Object.values(errs)[0]?.[0] : err?.response?.data?.message;
@@ -161,7 +233,7 @@ export default function BarangKeluar() {
               {exporting ? "Menyiapkan..." : "Unduh Data"}
             </button>
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={openCreateModal}
               className="flex items-center gap-1.5 bg-idm-red hover:bg-idm-red-dark text-white px-4 py-2 rounded-xl font-bold text-body-sm shadow-sm transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">outbox</span>Input Barang Keluar
@@ -203,7 +275,17 @@ export default function BarangKeluar() {
           </span>
         }
         description="Riwayat pengeluaran barang seluruh gerai"
-        actions={<TableSearch value={search} onChange={handleSearch} placeholder="Cari gerai, kategori, penginput..." />}
+        actions={
+          <>
+            <TableSearch value={search} onChange={handleSearch} placeholder="Cari gerai, kategori, penginput..." />
+            <TableFilter
+              value={filters}
+              onChange={handleFilters}
+              sortGroups={SORT_GROUPS}
+              categories={categoryList}
+            />
+          </>
+        }
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -215,6 +297,7 @@ export default function BarangKeluar() {
                 <th className="py-2.5 px-3 text-right">Qty</th>
                 <th className="py-2.5 px-3 text-right">Total Beban</th>
                 <th className="py-2.5 px-3">Diinput Oleh</th>
+                <th className="py-2.5 px-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle text-body-sm">
@@ -237,14 +320,38 @@ export default function BarangKeluar() {
                     {formatRupiah(row.value)}
                   </td>
                   <td className="py-3 px-3 text-[12px] text-text-muted">{row.employee?.name || row.user?.name}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openEditModal(row)}
+                        type="button"
+                        title="Edit transaksi"
+                        aria-label={`Edit transaksi ${formatDate(row.date)}`}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 border border-slate-200 text-text-muted hover:text-idm-blue hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(row)}
+                        type="button"
+                        title="Hapus transaksi"
+                        aria-label={`Hapus transaksi ${formatDate(row.date)}`}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 border border-slate-200 text-text-muted hover:text-idm-red hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-text-muted text-sm">
+                  <td colSpan={7} className="py-8 text-center text-text-muted text-sm">
                     {search
                       ? `Tidak ada transaksi yang cocok dengan "${search}".`
-                      : "Belum ada transaksi barang keluar."}
+                      : countActiveFilters(filters) > 0
+                        ? "Tidak ada transaksi yang cocok dengan filter. Coba ubah atau reset filter."
+                        : "Belum ada transaksi barang keluar."}
                   </td>
                 </tr>
               )}
@@ -266,8 +373,8 @@ export default function BarangKeluar() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Input Barang Keluar"
-        description="Pencatatan mutasi dan pengeluaran barang retail per gerai"
+        title={editingRow ? "Edit Barang Keluar" : "Input Barang Keluar"}
+        description={editingRow ? `Ubah transaksi ${formatDate(editingRow.date)}` : "Pencatatan mutasi dan pengeluaran barang retail per gerai"}
         footer={
           <>
             <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
@@ -288,34 +395,35 @@ export default function BarangKeluar() {
                 className="px-4 py-2 rounded-xl bg-idm-red hover:bg-idm-red-dark text-white text-sm font-bold shadow-sm disabled:opacity-60 flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">save</span>
-                {saving ? "Menyimpan..." : "Simpan Barang Keluar"}
+                {saving ? "Menyimpan..." : editingRow ? "Simpan Perubahan" : "Simpan Barang Keluar"}
               </button>
             </div>
           </>
         }
       >
         <form id="form-barang-keluar" onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {isManager && (
-              <Field label="Gerai Indomaret" code="store_id" required>
-                <InputShell icon="storefront">
-                  <select
-                    required
-                    className={inputClass}
-                    value={form.store_id}
-                    onChange={(e) => setForm((f) => ({ ...f, store_id: e.target.value }))}
-                  >
-                    <option value="">Pilih gerai...</option>
-                    {storeList.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.store_code} • {i.name}
-                      </option>
-                    ))}
-                  </select>
-                </InputShell>
-              </Field>
-            )}
-            <Field label="Kategori Produk" code="item_category_id" required>
+          {!editingRow && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {isManager && (
+                <Field label="Gerai Indomaret" code="store_id" required>
+                  <InputShell icon="storefront">
+                    <select
+                      required
+                      className={inputClass}
+                      value={form.store_id}
+                      onChange={(e) => setForm((f) => ({ ...f, store_id: e.target.value }))}
+                    >
+                      <option value="">Pilih gerai...</option>
+                      {storeList.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.store_code} • {i.name}
+                        </option>
+                      ))}
+                    </select>
+                  </InputShell>
+                </Field>
+              )}
+              <Field label="Kategori Produk" code="item_category_id" required>
               <InputShell icon="category">
                 <select
                   required
@@ -331,8 +439,30 @@ export default function BarangKeluar() {
                   ))}
                 </select>
               </InputShell>
-            </Field>
-          </div>
+              </Field>
+            </div>
+          )}
+          {editingRow && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <Field label="Kategori Produk" code="item_category_id" required>
+                <InputShell icon="category">
+                  <select
+                    required
+                    className={inputClass}
+                    value={form.item_category_id}
+                    onChange={(e) => setForm((f) => ({ ...f, item_category_id: e.target.value }))}
+                  >
+                    <option value="">Pilih kategori...</option>
+                    {categoryList.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.name}
+                      </option>
+                    ))}
+                  </select>
+                </InputShell>
+              </Field>
+            </div>
+          )}
 
           <Field label="Tanggal Keluar" code="date" required>
             <InputShell icon="calendar_today">
@@ -388,15 +518,17 @@ export default function BarangKeluar() {
             </InputShell>
           </Field>
 
-          <EmployeeInputToggle
-            mode={form.mode}
-            onModeChange={(mode) => setForm((f) => ({ ...f, mode }))}
-            name={form.employee_name}
-            onNameChange={(v) => setForm((f) => ({ ...f, employee_name: v }))}
-            password={form.employee_password}
-            onPasswordChange={(v) => setForm((f) => ({ ...f, employee_password: v }))}
-            employeeOptions={employeeList}
-          />
+          {!editingRow && (
+            <EmployeeInputToggle
+              mode={form.mode}
+              onModeChange={(mode) => setForm((f) => ({ ...f, mode }))}
+              name={form.employee_name}
+              onNameChange={(v) => setForm((f) => ({ ...f, employee_name: v }))}
+              password={form.employee_password}
+              onPasswordChange={(v) => setForm((f) => ({ ...f, employee_password: v }))}
+              employeeOptions={employeeList}
+            />
+          )}
 
           {formError && (
             <div className="flex items-center gap-2 text-idm-red bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs font-semibold">

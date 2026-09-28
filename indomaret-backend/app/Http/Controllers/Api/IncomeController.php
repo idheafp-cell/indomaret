@@ -37,8 +37,12 @@ class IncomeController extends Controller
             $query->where('status', $request->string('status'));
         }
 
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('date', [$request->date('start_date'), $request->date('end_date')]);
+        // Rentang tanggal boleh diisi salah satu saja (mis. "sejak tanggal X").
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->date('start_date'));
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->date('end_date'));
         }
 
         // Pencarian bebas dari tabel di frontend — dikerjakan di server supaya
@@ -57,12 +61,28 @@ class IncomeController extends Controller
             });
         }
 
-        $query->orderByDesc('date')->orderByDesc('id');
-
         // Ringkasan dihitung dari SELURUH data yang cocok dengan filter (bukan
         // cuma baris di halaman yang sedang dibuka) — dipakai kartu KPI di
         // frontend supaya angkanya tidak berubah-ubah tiap pindah halaman.
         $totalsQuery = clone $query;
+
+        // Urutan tabel dipilih dari tombol Filter di frontend. Dikerjakan di
+        // server supaya "omset tertinggi" benar-benar tertinggi dari SELURUH
+        // data, bukan cuma dari 8 baris di halaman yang sedang terbuka.
+        // Nilai `sort` di-whitelist supaya tidak bisa dipakai menyuntik SQL.
+        $sort = $request->string('sort', 'date_desc')->toString();
+        $columnSorts = [
+            'date_desc' => ['date', 'desc'],
+            'date_asc' => ['date', 'asc'],
+            'amount_desc' => ['amount', 'desc'],
+            'amount_asc' => ['amount', 'asc'],
+        ];
+
+        if (isset($columnSorts[$sort])) {
+            [$column, $direction] = $columnSorts[$sort];
+            $query->orderBy($column, $direction);
+        }
+        $query->orderByDesc('date')->orderByDesc('id');
 
         $paginated = $query->paginate($request->integer('per_page', 20));
 

@@ -20,7 +20,7 @@ import { formatRupiah } from "../lib/format";
 import { storeDot, clusterIcon } from "../components/map/MapMarkerIcon";
 import StorePopupCard from "../components/map/StorePopupCard";
 
-const ZONE_COLORS = ["#005baa", "#d61c24", "#fdb813", "#334155", "#0ea5e9", "#7c3aed"];
+const ZONE_COLORS = ["#145fa0", "#bf3339", "#e1a81f", "#334155", "#0ea5e9", "#7c3aed"];
 
 // Stop warna choropleth buat batas kecamatan (tab "Wilayah Kecamatan"): hijau
 // (pemasukan rendah) -> kuning -> merah (pemasukan TERTINGGI se-kota) --
@@ -739,11 +739,11 @@ export default function Peta() {
                   // beberapa cluster berdekatan, polygon-polygon itu saling
                   // tumpang tindih dan bikin peta keliatan berantakan.
                   showCoverageOnHover={false}
-                  spiderLegPolylineOptions={{ color: "#005baa", weight: 1.5, opacity: 0.6 }}
+                  spiderLegPolylineOptions={{ color: "#145fa0", weight: 1.5, opacity: 0.6 }}
                   iconCreateFunction={(cluster) => clusterIcon(cluster.getChildCount())}
                 >
                   {visibleGerai.map((g) => (
-                    <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot("#005baa")}>
+                    <Marker key={g.id} position={[g.latitude, g.longitude]} icon={storeDot("#145fa0")}>
                       <Popup maxWidth={444} minWidth={404}>
                         <StorePopupCard gerai={g} />
                       </Popup>

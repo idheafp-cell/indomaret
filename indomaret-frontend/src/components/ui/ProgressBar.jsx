@@ -1,4 +1,4 @@
-export default function ProgressBar({ percent, color = "#005baa", height = "h-1.5" }) {
+export default function ProgressBar({ percent, color = "#145fa0", height = "h-1.5" }) {
   const safe = Math.max(0, Math.min(100, Number(percent) || 0));
   return (
     <div className={`w-full bg-slate-100 rounded-full ${height} overflow-hidden`}>

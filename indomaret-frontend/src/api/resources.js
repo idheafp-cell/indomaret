@@ -60,6 +60,10 @@ export const listExpenses = (params) =>
   apiClient.get("/expenses", { params }).then((r) => r.data);
 export const createExpense = (payload) =>
   apiClient.post("/expenses", payload).then((r) => r.data.data);
+export const updateExpense = (id, payload) =>
+  apiClient.put(`/expenses/${id}`, payload).then((r) => r.data.data);
+export const deleteExpense = (id) =>
+  apiClient.delete(`/expenses/${id}`).then((r) => r.data);
 export const approveExpense = (id) =>
   apiClient.post(`/expenses/${id}/approve`).then((r) => r.data.data);
 export const rejectExpense = (id, rejection_reason) =>
@@ -70,6 +74,10 @@ export const listIncomes = (params) =>
   apiClient.get("/incomes", { params }).then((r) => r.data);
 export const createIncome = (payload) =>
   apiClient.post("/incomes", payload).then((r) => r.data.data);
+export const updateIncome = (id, payload) =>
+  apiClient.put(`/incomes/${id}`, payload).then((r) => r.data.data);
+export const deleteIncome = (id) =>
+  apiClient.delete(`/incomes/${id}`).then((r) => r.data);
 export const approveIncome = (id) =>
   apiClient.post(`/incomes/${id}/approve`).then((r) => r.data.data);
 export const rejectIncome = (id, rejection_reason) =>

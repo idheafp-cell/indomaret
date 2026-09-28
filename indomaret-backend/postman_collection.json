@@ -1,19 +1,19 @@
 {
   "info": {
     "name": "Dashboard Indomaret - API",
-    "description": "Koleksi Postman untuk backend Laravel Dashboard Indomaret.",
+    "description": "Koleksi Postman untuk backend Laravel Dashboard Indomaret. Skema data (nama tabel/kolom/endpoint) sudah dalam Bahasa Inggris; teks pesan error & label tetap Bahasa Indonesia.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:8000/api" },
     { "key": "token", "value": "" },
-    { "key": "kabupaten_id", "value": "1" },
-    { "key": "indomaret_id", "value": "1" },
-    { "key": "kategori_id", "value": "1" },
+    { "key": "regency_id", "value": "1" },
+    { "key": "store_id", "value": "1" },
+    { "key": "item_category_id", "value": "1" },
     { "key": "employee_id", "value": "1" },
     { "key": "user_id", "value": "1" },
-    { "key": "pengeluaran_id", "value": "1" },
-    { "key": "pemasukan_id", "value": "1" }
+    { "key": "expense_id", "value": "1" },
+    { "key": "income_id", "value": "1" }
   ],
   "item": [
     {
@@ -40,6 +40,18 @@
           }
         },
         {
+          "name": "Update Password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"password456\",\n  \"new_password_confirmation\": \"password456\"\n}"
+            },
+            "url": "{{base_url}}/me/password"
+          }
+        },
+        {
           "name": "Logout",
           "request": {
             "method": "POST",
@@ -50,10 +62,39 @@
       ]
     },
     {
-      "name": "Dashboard & Peta",
+      "name": "Notifications",
       "item": [
         {
-          "name": "Dashboard Summary",
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notifications?unread_only=0&per_page=15"
+          }
+        },
+        {
+          "name": "Mark One Read",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notifications/1/read"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notifications/read-all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Stores Map",
+      "item": [
+        {
+          "name": "Dashboard Summary (manager)",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
@@ -61,78 +102,141 @@
           }
         },
         {
-          "name": "Peta Sebaran Indomaret",
+          "name": "Stores Map (peta sebaran)",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{base_url}}/peta-sebaran"
+            "url": "{{base_url}}/stores/map"
+          }
+        },
+        {
+          "name": "Store Map Summary (isi popup peta)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/stores/{{store_id}}/map-summary"
           }
         }
       ]
     },
     {
-      "name": "Master - Kabupaten (manager)",
+      "name": "Master - Regencies (manager)",
       "item": [
         {
-          "name": "List Kabupaten",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/kabupaten" }
+          "name": "List Regencies",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/regencies" }
         },
         {
-          "name": "Create Kabupaten",
+          "name": "Create Regency",
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Kabupaten Sidoarjo\",\n  \"provinsi\": \"Jawa Timur\"\n}" },
-            "url": "{{base_url}}/kabupaten"
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Kabupaten Sidoarjo\",\n  \"province\": \"Jawa Timur\"\n}" },
+            "url": "{{base_url}}/regencies"
+          }
+        },
+        {
+          "name": "Update Regency",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Kota Surabaya\",\n  \"province\": \"Jawa Timur\"\n}" },
+            "url": "{{base_url}}/regencies/{{regency_id}}"
+          }
+        },
+        {
+          "name": "Delete Regency",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/regencies/{{regency_id}}"
           }
         }
       ]
     },
     {
-      "name": "Master - Indomaret",
+      "name": "Master - Stores",
       "item": [
         {
-          "name": "List Indomaret",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/indomaret" }
+          "name": "List Stores (manager, supervisor)",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/stores" }
         },
         {
-          "name": "Create Indomaret (manager)",
+          "name": "Show Store",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/stores/{{store_id}}" }
+        },
+        {
+          "name": "Create Store (manager)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"kabupaten_id\": {{kabupaten_id}},\n  \"kode_toko\": \"IDM-005\",\n  \"nama\": \"Indomaret Baru\",\n  \"alamat\": \"Jl. Contoh No. 1\",\n  \"kecamatan\": \"Sidoarjo\",\n  \"latitude\": -7.4478,\n  \"longitude\": 112.7183,\n  \"no_telp\": \"031-8945123\"\n}"
+              "raw": "{\n  \"regency_id\": {{regency_id}},\n  \"store_code\": \"IDM-SBY-260\",\n  \"name\": \"Indomaret Baru\",\n  \"address\": \"Jl. Contoh No. 1\",\n  \"district\": \"Gubeng\",\n  \"latitude\": -7.2650,\n  \"longitude\": 112.7520,\n  \"phone\": \"031-8945123\",\n  \"photo_url\": null\n}"
             },
-            "url": "{{base_url}}/indomaret"
+            "url": "{{base_url}}/stores"
+          }
+        },
+        {
+          "name": "Update Store (manager)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"031-8945999\",\n  \"is_active\": true\n}" },
+            "url": "{{base_url}}/stores/{{store_id}}"
+          }
+        },
+        {
+          "name": "Delete Store (manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/stores/{{store_id}}"
           }
         }
       ]
     },
     {
-      "name": "Master - Kategori Barang",
+      "name": "Master - Item Categories",
       "item": [
         {
-          "name": "List Kategori",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/kategori-barang" }
+          "name": "List Item Categories",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/item-categories?active_only=1" }
         },
         {
-          "name": "Create Kategori (manager)",
+          "name": "Create Item Category (manager)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Minuman\"\n}" },
-            "url": "{{base_url}}/kategori-barang"
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Minuman\",\n  \"description\": \"Minuman kemasan & botol\"\n}" },
+            "url": "{{base_url}}/item-categories"
+          }
+        },
+        {
+          "name": "Update Item Category (manager)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" },
+            "url": "{{base_url}}/item-categories/{{item_category_id}}"
+          }
+        },
+        {
+          "name": "Delete Item Category (manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/item-categories/{{item_category_id}}"
           }
         }
       ]
     },
     {
-      "name": "Akun Supervisor (manager)",
+      "name": "Accounts - Users (manager)",
       "item": [
         {
           "name": "List Users",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/users" }
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/users?role=supervisor" }
         },
         {
           "name": "Create Supervisor",
@@ -141,94 +245,242 @@
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Supervisor Baru\",\n  \"email\": \"supervisor.baru@indomaret-dashboard.test\",\n  \"password\": \"password123\",\n  \"role\": \"supervisor\",\n  \"indomaret_id\": {{indomaret_id}}\n}"
+              "raw": "{\n  \"name\": \"Supervisor Baru\",\n  \"email\": \"supervisor.baru@indomaret-dashboard.test\",\n  \"password\": \"password123\",\n  \"role\": \"supervisor\",\n  \"store_id\": {{store_id}}\n}"
             },
             "url": "{{base_url}}/users"
           }
+        },
+        {
+          "name": "Create Cashier Account",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kasir Toko\",\n  \"email\": \"kasir.baru@indomaret-dashboard.test\",\n  \"password\": \"password123\",\n  \"role\": \"cashier\",\n  \"store_id\": {{store_id}}\n}"
+            },
+            "url": "{{base_url}}/users"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" },
+            "url": "{{base_url}}/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/users/{{user_id}}"
+          }
         }
       ]
     },
     {
-      "name": "Karyawan / Kasir (supervisor)",
+      "name": "Employees (manager, supervisor)",
       "item": [
         {
-          "name": "List Karyawan",
+          "name": "List Employees",
           "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/employees" }
         },
         {
-          "name": "Tambah Kasir",
+          "name": "Create Employee (supervisor - store implicit)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nama\": \"Kasir Tiga\",\n  \"password\": \"kasir123\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Kasir Tiga\",\n  \"password\": \"kasir123\"\n}" },
             "url": "{{base_url}}/employees"
           }
-        }
-      ]
-    },
-    {
-      "name": "Pengeluaran Barang",
-      "item": [
-        {
-          "name": "List Pengeluaran",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/pengeluaran?start_date=2026-09-01&end_date=2026-09-30" }
         },
         {
-          "name": "Input Pengeluaran (oleh Supervisor sendiri)",
+          "name": "Create Employee (manager - store_id wajib)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kategori_barang_id\": {{kategori_id}},\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah_barang\": 20,\n  \"satuan\": \"pcs\",\n  \"nilai\": 250000,\n  \"keterangan\": \"Stok opname harian\"\n}"
-            },
-            "url": "{{base_url}}/pengeluaran"
+            "body": { "mode": "raw", "raw": "{\n  \"store_id\": {{store_id}},\n  \"name\": \"Kasir Tiga\",\n  \"password\": \"kasir123\"\n}" },
+            "url": "{{base_url}}/employees"
           }
         },
         {
-          "name": "Input Pengeluaran (oleh Kasir - butuh nama & password)",
+          "name": "Update Employee",
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kategori_barang_id\": {{kategori_id}},\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah_barang\": 10,\n  \"nilai\": 120000,\n  \"employee_nama\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
-            },
-            "url": "{{base_url}}/pengeluaran"
+            "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" },
+            "url": "{{base_url}}/employees/{{employee_id}}"
+          }
+        },
+        {
+          "name": "Delete Employee",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/employees/{{employee_id}}"
           }
         }
       ]
     },
     {
-      "name": "Pemasukan",
+      "name": "Expenses (Barang Keluar)",
       "item": [
         {
-          "name": "List Pemasukan",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/pemasukan?start_date=2026-09-01&end_date=2026-09-30" }
-        },
-        {
-          "name": "Input Pemasukan (oleh Kasir)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"tanggal\": \"2026-09-13\",\n  \"jumlah\": 3500000,\n  \"employee_nama\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
-            },
-            "url": "{{base_url}}/pemasukan"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Laporan PDF",
-      "item": [
-        {
-          "name": "Download Laporan Pengeluaran & Pemasukan",
+          "name": "List Expenses",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{base_url}}/laporan/pengeluaran-pemasukan/pdf?indomaret_id={{indomaret_id}}&start_date=2026-09-01&end_date=2026-09-30"
+            "url": "{{base_url}}/expenses?start_date=2026-09-01&end_date=2026-09-30&status=approved&search="
+          }
+        },
+        {
+          "name": "Show Expense",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/expenses/{{expense_id}}" }
+        },
+        {
+          "name": "Create Expense (manager/supervisor sendiri)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_category_id\": {{item_category_id}},\n  \"date\": \"2026-09-15\",\n  \"quantity\": 20,\n  \"unit\": \"pcs\",\n  \"value\": 250000,\n  \"notes\": \"Stok opname harian\"\n}"
+            },
+            "url": "{{base_url}}/expenses"
+          }
+        },
+        {
+          "name": "Create Expense (akun cashier - butuh nama & password karyawan)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_category_id\": {{item_category_id}},\n  \"date\": \"2026-09-15\",\n  \"quantity\": 10,\n  \"value\": 120000,\n  \"employee_name\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
+            },
+            "url": "{{base_url}}/expenses"
+          }
+        },
+        {
+          "name": "Update Expense (manager, supervisor)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 25,\n  \"value\": 300000\n}" },
+            "url": "{{base_url}}/expenses/{{expense_id}}"
+          }
+        },
+        {
+          "name": "Delete Expense (manager, supervisor)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/expenses/{{expense_id}}"
+          }
+        },
+        {
+          "name": "Approve Expense",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/expenses/{{expense_id}}/approve"
+          }
+        },
+        {
+          "name": "Reject Expense",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rejection_reason\": \"Nilai tidak sesuai nota, mohon input ulang.\"\n}" },
+            "url": "{{base_url}}/expenses/{{expense_id}}/reject"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Incomes (Pemasukan)",
+      "item": [
+        {
+          "name": "List Incomes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/incomes?start_date=2026-09-01&end_date=2026-09-30&status=approved&search="
+          }
+        },
+        {
+          "name": "Show Income",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{base_url}}/incomes/{{income_id}}" }
+        },
+        {
+          "name": "Create Income (manager/supervisor sendiri)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-09-15\",\n  \"amount\": 3500000,\n  \"notes\": \"Setoran kasir shift pagi\"\n}" },
+            "url": "{{base_url}}/incomes"
+          }
+        },
+        {
+          "name": "Create Income (akun cashier - butuh nama & password karyawan)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-09-15\",\n  \"amount\": 3500000,\n  \"employee_name\": \"Kasir Satu\",\n  \"employee_password\": \"kasir123\"\n}"
+            },
+            "url": "{{base_url}}/incomes"
+          }
+        },
+        {
+          "name": "Update Income (manager, supervisor)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 4000000\n}" },
+            "url": "{{base_url}}/incomes/{{income_id}}"
+          }
+        },
+        {
+          "name": "Delete Income (manager, supervisor)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/incomes/{{income_id}}"
+          }
+        },
+        {
+          "name": "Approve Income",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/incomes/{{income_id}}/approve"
+          }
+        },
+        {
+          "name": "Reject Income",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rejection_reason\": \"Nominal tidak sesuai setoran fisik.\"\n}" },
+            "url": "{{base_url}}/incomes/{{income_id}}/reject"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Download PDF Expenses & Incomes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/reports/expenses-incomes/pdf?store_id={{store_id}}&start_date=2026-09-01&end_date=2026-09-30"
           }
         }
       ]

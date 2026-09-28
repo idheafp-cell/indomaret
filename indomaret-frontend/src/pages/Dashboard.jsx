@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { getDashboard, listStores, listExpenses, listIncomes } from "../api/resources";
 import { formatRupiah, formatDate, todayISO } from "../lib/format";
 
-const CATEGORY_COLORS = ["#005baa", "#d61c24", "#fdb813", "#475569", "#0ea5e9", "#be123c", "#ca8a04"];
+const CATEGORY_COLORS = ["#145fa0", "#bf3339", "#e1a81f", "#475569", "#0ea5e9", "#be123c", "#ca8a04"];
 
 function firstDayOfMonth() {
   const d = new Date();

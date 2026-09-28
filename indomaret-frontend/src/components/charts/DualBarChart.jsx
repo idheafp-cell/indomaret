@@ -105,8 +105,8 @@ export default function DualBarChart({ data, aLabel = "Pemasukan", bLabel = "Pen
           return (
             <g key={d.label}>
               <title>{`${d.label} — ${aLabel}: ${compactNumber(d.a)}, ${bLabel}: ${compactNumber(d.b)}`}</title>
-              <rect fill="#005baa" height={Math.max(0, baseline - ya)} rx="3" width={barWidth} x={xa} y={ya} />
-              <rect fill="#d61c24" height={Math.max(0, baseline - yb)} rx="3" width={barWidth} x={xb} y={yb} />
+              <rect fill="#145fa0" height={Math.max(0, baseline - ya)} rx="3" width={barWidth} x={xa} y={ya} />
+              <rect fill="#bf3339" height={Math.max(0, baseline - yb)} rx="3" width={barWidth} x={xb} y={yb} />
             </g>
           );
         })}

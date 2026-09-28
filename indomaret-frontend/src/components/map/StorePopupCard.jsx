@@ -205,7 +205,7 @@ function TabDistribusi({ rows = [] }) {
           return (
             <g key={r.category}>
               <title>{`${r.category}: ${r.unit} unit`}</title>
-              <rect x={x} y={baseline - h} width={barWidth} height={Math.max(1, h)} rx="3" fill="#005baa" />
+              <rect x={x} y={baseline - h} width={barWidth} height={Math.max(1, h)} rx="3" fill="#145fa0" />
               <text
                 x={slot * i + slot / 2}
                 y={baseline - h - 4}
@@ -275,8 +275,8 @@ function TabTren({ rows = [] }) {
               <title>{`${tanggalPendek(r.date)} — masuk ${formatRupiah(r.income, {
                 compact: true,
               })}, keluar ${formatRupiah(r.expense, { compact: true })}`}</title>
-              <rect x={cx - barWidth - 1} y={baseline - ha} width={barWidth} height={Math.max(1, ha)} rx="2.5" fill="#005baa" />
-              <rect x={cx + 1} y={baseline - hb} width={barWidth} height={Math.max(1, hb)} rx="2.5" fill="#d61c24" />
+              <rect x={cx - barWidth - 1} y={baseline - ha} width={barWidth} height={Math.max(1, ha)} rx="2.5" fill="#145fa0" />
+              <rect x={cx + 1} y={baseline - hb} width={barWidth} height={Math.max(1, hb)} rx="2.5" fill="#bf3339" />
               <text x={cx} y={baseline + 12} textAnchor="middle" fontSize="8.5" fill="#64748b">
                 {tanggalPendek(r.date)}
               </text>
